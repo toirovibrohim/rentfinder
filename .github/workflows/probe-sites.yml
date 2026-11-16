@@ -1,13 +1,13 @@
-name: Probe OLX reachability
+name: Probe site reachability
 
-# One-off check: can a GitHub runner actually reach olx.uz? Datacenter IPs are
-# often blocked by CloudFront, which would rule OLX out before any adapter is
+# Which listing sites can a GitHub runner actually reach? Datacenter IPs are
+# often blocked by CDNs, which rules a site out before any adapter is
 # written. Runs only when the probe itself changes, plus on demand.
 on:
   push:
     paths:
-      - 'scripts/probe-olx.js'
-      - '.github/workflows/olx-probe.yml'
+      - 'scripts/probe-sites.js'
+      - '.github/workflows/probe-sites.yml'
   workflow_dispatch:
 
 jobs:
@@ -19,4 +19,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node scripts/probe-olx.js
+      - run: node scripts/probe-sites.js
