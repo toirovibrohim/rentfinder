@@ -20,6 +20,34 @@ const OWNER_HELP = [
   '/whoami — your own chat id',
 ].join('\n');
 
+/**
+ * The owner's notification for an access request, with the decision as
+ * buttons. Callback data is "approve:<chatId>:<hours>" or "deny:<chatId>",
+ * which stays well inside Telegram's 64-byte limit for a chat id.
+ */
+export function accessRequest(chatId, { name, alreadyActive = null, accessHours }) {
+  const who = name ? escapeHtml(name) : 'Someone';
+  const standing = alreadyActive
+    ? `
+They already have access — ${escapeHtml(alreadyActive)} left.`
+    : '';
+
+  return {
+    to: null, // filled in by the caller
+    text:
+      `👤 <b>${who}</b> asked for access
+` +
+      `chat id: <code>${escapeHtml(chatId)}</code>${standing}`,
+    buttons: [
+      [
+        { text: `✅ Approve ${accessHours}h`, callback_data: `approve:${chatId}:${accessHours}` },
+        { text: '📅 7 days', callback_data: `approve:${chatId}:168` },
+      ],
+      [{ text: '🚫 Deny', callback_data: `deny:${chatId}` }],
+    ],
+  };
+}
+
 function describeUser(message) {
   const from = message.from || {};
   const name = [from.first_name, from.last_name].filter(Boolean).join(' ').trim();
@@ -66,27 +94,26 @@ export function handleMessage(message, { ownerId, subscribers, accessHours }) {
       }
 
       const entry = subscribers[chatId];
-      if (isActive(entry)) {
-        replies.push({
-          to: chatId,
-          text: `✅ You have access for another <b>${escapeHtml(remaining(entry))}</b>. New listings will arrive here.`,
-        });
-      } else {
-        replies.push({
-          to: chatId,
-          text:
-            'This bot sends new rental listings to approved people only.\n\n' +
-            `Your chat id is <code>${escapeHtml(chatId)}</code> — send it to the owner to ask for access.`,
-        });
-        // Tell the owner, with the command ready to copy.
-        replies.push({
-          to: String(ownerId),
-          text:
-            `👤 Access requested by ${escapeHtml(describeUser(message) || 'someone')}\n` +
-            `chat id: <code>${escapeHtml(chatId)}</code>\n\n` +
-            `Approve with:\n<code>/approve ${escapeHtml(chatId)}</code>`,
-        });
-      }
+      const live = isActive(entry);
+
+      replies.push({
+        to: chatId,
+        text: live
+          ? `✅ You have access for another <b>${escapeHtml(remaining(entry))}</b>. New listings will arrive here.`
+          : 'This bot sends new rental listings to approved people only.\n\n' +
+            'The owner has been asked to approve you — you will hear back here.',
+      });
+
+      // Every request goes to the owner to decide, including from people who
+      // already have access and are asking to extend it.
+      replies.push({
+        ...accessRequest(chatId, {
+          name: describeUser(message),
+          alreadyActive: live ? remaining(entry) : null,
+          accessHours,
+        }),
+        to: String(ownerId),
+      });
       break;
     }
 
@@ -193,4 +220,65 @@ export function handleMessage(message, { ownerId, subscribers, accessHours }) {
   }
 
   return { replies, changed };
+}
+
+/**
+ * Applies a tapped Approve/Deny button.
+ *
+ * Only the owner's taps count — callback data is attacker-controllable, so a
+ * tap from anyone else is refused outright rather than trusted.
+ *
+ * Returns the toast to show on the button, how to rewrite the owner's
+ * message, any message for the requester, and whether the list changed.
+ */
+export function handleCallback(callback, { ownerId, subscribers, accessHours }) {
+  const from = String(callback.from?.id ?? '');
+  const data = String(callback.data || '');
+
+  if (from !== String(ownerId)) {
+    return { toast: 'Only the owner can decide this.', edit: null, replies: [], changed: false };
+  }
+
+  const [action, target, hoursRaw] = data.split(':');
+  if (!target) {
+    return { toast: 'That button is no longer valid.', edit: null, replies: [], changed: false };
+  }
+
+  if (action === 'deny') {
+    // Denying is also how access is taken away from someone who has it.
+    const had = revoke(subscribers, target);
+    return {
+      toast: 'Denied',
+      edit: `🚫 Denied access for <code>${escapeHtml(target)}</code>.`,
+      replies: had
+        ? [{ to: target, text: '🚫 Your access to this bot has been removed.' }]
+        : [],
+      changed: had,
+    };
+  }
+
+  if (action === 'approve') {
+    const hours = Number.parseFloat(hoursRaw) || accessHours;
+    const entry = approve(subscribers, target, { hours });
+    const until = entry.expiresAt.slice(0, 16).replace('T', ' ');
+
+    return {
+      toast: `Approved for ${hours}h`,
+      edit:
+        `✅ Approved <code>${escapeHtml(target)}</code> for <b>${hours}h</b>\n` +
+        `until ${escapeHtml(until)} UTC`,
+      replies: [
+        {
+          to: target,
+          text:
+            `✅ You have been given access for <b>${hours}h</b>.\n` +
+            'New rental listings will arrive here as they are posted.\n\n' +
+            'Send /status any time to see how long is left.',
+        },
+      ],
+      changed: true,
+    };
+  }
+
+  return { toast: 'Unknown action.', edit: null, replies: [], changed: false };
 }

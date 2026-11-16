@@ -133,14 +133,33 @@ export class TelegramClient {
     throw lastError;
   }
 
-  /** `to` defaults to the owner's chat. */
-  async sendText(text, { to = this.chatId, disablePreview = true } = {}) {
+  /** `to` defaults to the owner's chat. `buttons` adds an inline keyboard. */
+  async sendText(text, { to = this.chatId, disablePreview = true, buttons = null } = {}) {
     return this.#call('sendMessage', {
       chat_id: to,
       text,
       parse_mode: 'HTML',
       disable_web_page_preview: disablePreview,
+      ...(buttons ? { reply_markup: { inline_keyboard: buttons } } : {}),
     });
+  }
+
+  /** Replaces a message's text, used to show how a request was decided. */
+  async editText(chatId, messageId, text) {
+    return this.#call(
+      'editMessageText',
+      { chat_id: chatId, message_id: messageId, text, parse_mode: 'HTML' },
+      { attempts: 1 }
+    );
+  }
+
+  /** Clears the spinner on a tapped button. Telegram requires this. */
+  async answerCallback(callbackId, text = '') {
+    return this.#call(
+      'answerCallbackQuery',
+      { callback_query_id: callbackId, ...(text ? { text } : {}) },
+      { attempts: 1 }
+    );
   }
 
   /** Sends the listing photo with the details as a caption; falls back to text. */
@@ -177,7 +196,7 @@ export class TelegramClient {
         ...(offset ? { offset } : {}),
         limit,
         timeout: 0,
-        allowed_updates: ['message'],
+        allowed_updates: ['message', 'callback_query'],
       },
       { attempts: 2 }
     );

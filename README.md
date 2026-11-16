@@ -259,16 +259,23 @@ approval lasts. The default is 24.
 
 ### Using it
 
-Someone who wants access messages the bot. They are told their chat id and get
-nothing else; you get a notification with the command ready to copy:
+Someone sends the bot `/start`. They are told the owner has been asked, and
+get nothing else. You get the request with the decision as buttons:
 
 ```
-👤 Access requested by Dilnoza
+👤 Dilnoza asked for access
 chat id: 123456789
 
-Approve with:
-/approve 123456789
+[ ✅ Approve 24h ]  [ 📅 7 days ]
+[      🚫 Deny      ]
 ```
+
+Tapping rewrites that message with what you chose and tells them. The buttons
+are checked against your chat id, so a tap from anyone else is refused —
+button data travels through the client and cannot be trusted on its own.
+
+Requests from people who already have access are passed on too, noting how
+long they have left, so extending is one tap.
 
 Your commands:
 

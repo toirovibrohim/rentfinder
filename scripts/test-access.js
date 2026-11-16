@@ -6,7 +6,7 @@
  */
 
 import { unlink } from 'node:fs/promises';
-import { handleMessage } from '../src/commands.js';
+import { handleMessage, handleCallback } from '../src/commands.js';
 import {
   loadSubscribers, saveSubscribers, approve, isActive,
   activeChatIds, pruneExpired, remaining,
@@ -37,15 +37,78 @@ console.log('\nstranger cannot grant themselves access');
   check('list unchanged', r.changed, false);
 }
 
-console.log('\nstranger sending /start is told their id, and the owner is notified');
+console.log('\nstranger sending /start notifies the owner with buttons');
 {
   const subs = {};
   const r = run(subs, GUEST, '/start');
   check('two replies', r.replies.length, 2);
-  check('guest told their id', r.replies[0].text.includes(GUEST), true);
   check('owner notified', r.replies[1].to, OWNER);
-  check('owner gets a ready command', r.replies[1].text.includes(`/approve ${GUEST}`), true);
+  check('request shows the chat id', r.replies[1].text.includes(GUEST), true);
+  check('request carries buttons', Array.isArray(r.replies[1].buttons), true);
+
+  const data = r.replies[1].buttons.flat().map((b) => b.callback_data);
+  check('approve / 7d / deny', data, [`approve:${GUEST}:24`, `approve:${GUEST}:168`, `deny:${GUEST}`]);
+  check('callback data within Telegram 64 bytes', data.every((d) => Buffer.byteLength(d) <= 64), true);
   check('still not approved', activeChatIds(subs), []);
+}
+
+console.log('\nowner is notified even when the requester already has access');
+{
+  const subs = {};
+  approve(subs, GUEST, { hours: 5 });
+  const r = run(subs, GUEST, '/start');
+  check('owner still told', r.replies[1].to, OWNER);
+  check('notes existing access', r.replies[1].text.includes('already have access'), true);
+}
+
+const tap = (subs, fromId, data) =>
+  handleCallback(
+    { id: 'q', from: { id: fromId }, data, message: { chat: { id: OWNER }, message_id: 7 } },
+    { ownerId: OWNER, subscribers: subs, accessHours: 24 }
+  );
+
+console.log('\nonly the owner can tap the buttons');
+{
+  const subs = {};
+  const stranger = tap(subs, GUEST, `approve:${GUEST}:24`);
+  check('refused', stranger.toast.includes('Only the owner'), true);
+  check('granted nothing', activeChatIds(subs), []);
+  check('message left alone', stranger.edit, null);
+
+  const owner = tap(subs, OWNER, `approve:${GUEST}:24`);
+  check('owner tap approves', activeChatIds(subs), [GUEST]);
+  check('toast confirms', owner.toast, 'Approved for 24h');
+  check('request rewritten', owner.edit.includes('Approved'), true);
+  check('guest told', owner.replies[0].to, GUEST);
+}
+
+console.log('\ndeny button');
+{
+  const subs = {};
+  approve(subs, GUEST, { hours: 24 });
+  const denied = tap(subs, OWNER, `deny:${GUEST}`);
+  check('access removed', activeChatIds(subs), []);
+  check('changed', denied.changed, true);
+  check('guest told', denied.replies[0].text.includes('removed'), true);
+
+  const again = tap(subs, OWNER, `deny:${GUEST}`);
+  check('denying twice is harmless', again.changed, false);
+  check('no pointless message', again.replies.length, 0);
+}
+
+console.log('\nthe 7-day button grants 7 days');
+{
+  const subs = {};
+  tap(subs, OWNER, `approve:${GUEST}:168`);
+  check('~168h', Math.round((Date.parse(subs[GUEST].expiresAt) - Date.now()) / 3600000), 168);
+}
+
+console.log('\nmalformed callback data is rejected');
+{
+  const subs = {};
+  check('empty', tap(subs, OWNER, '').toast.includes('no longer valid'), true);
+  check('unknown action', tap(subs, OWNER, 'explode:123').toast.includes('Unknown'), true);
+  check('granted nothing', activeChatIds(subs), []);
 }
 
 console.log('\nowner approves, guest gains access');

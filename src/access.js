@@ -6,7 +6,7 @@
  * be approved by the owner, and that approval runs out.
  */
 
-import { handleMessage } from './commands.js';
+import { handleMessage, handleCallback } from './commands.js';
 import { isUnreachableChat } from './telegram.js';
 import {
   loadSubscribers,
@@ -56,6 +56,40 @@ export async function processCommands(telegram, config, state, subscribers) {
   for (const update of updates) {
     state.lastUpdateId = Math.max(state.lastUpdateId || 0, update.update_id);
 
+    // A tapped Approve/Deny button.
+    if (update.callback_query) {
+      handled++;
+      const query = update.callback_query;
+
+      const outcome = handleCallback(query, {
+        ownerId: config.telegram.chatId,
+        subscribers,
+        accessHours: config.accessHours,
+      });
+
+      if (outcome.changed) changed = true;
+
+      // Telegram leaves the button spinning until this is answered.
+      await telegram.answerCallback(query.id, outcome.toast).catch(() => {});
+
+      // Rewrite the request so the decision is visible, and the buttons gone.
+      if (outcome.edit && query.message) {
+        await telegram
+          .editText(query.message.chat.id, query.message.message_id, outcome.edit)
+          .catch((err) => console.warn(`  could not update the request message: ${err.message}`));
+      }
+
+      for (const reply of outcome.replies) {
+        try {
+          await telegram.sendText(reply.text, { to: reply.to });
+        } catch (err) {
+          console.warn(`  could not tell ${reply.to}: ${err.message}`);
+        }
+      }
+
+      continue;
+    }
+
     const message = update.message;
     if (!message?.chat?.id) continue;
 
@@ -71,7 +105,7 @@ export async function processCommands(telegram, config, state, subscribers) {
 
     for (const reply of result.replies) {
       try {
-        await telegram.sendText(reply.text, { to: reply.to });
+        await telegram.sendText(reply.text, { to: reply.to, buttons: reply.buttons ?? null });
       } catch (err) {
         // Someone who has not started a chat with the bot cannot be written
         // to. That is expected for a freshly approved id.
