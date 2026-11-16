@@ -84,22 +84,24 @@ GitHub delays the schedule.
 
 ### 2. Find your chat ID
 
-Open this in a browser, with your token in place of `<TOKEN>`:
-
-```
-https://api.telegram.org/bot<TOKEN>/getUpdates
-```
-
-Look for `"chat":{"id":123456789` — that number is your `TELEGRAM_CHAT_ID`.
-If the response is empty, message the bot again and reload.
-
-### 3. Try it on your machine first
-
 ```bash
 cp .env.example .env
 ```
 
-Put your token, chat ID and search URL in `.env`, then:
+Put your token in `.env`, then:
+
+```bash
+npm run find-chat-id
+```
+
+It confirms the token works, lists every chat that has messaged the bot, and
+writes `TELEGRAM_CHAT_ID` into `.env` for you when there is exactly one.
+
+If it says no conversations were found, you have not messaged the bot yet.
+
+### 3. Try it on your machine first
+
+With the search URL set in `.env`:
 
 ```bash
 npm run verify

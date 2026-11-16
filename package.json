@@ -11,6 +11,7 @@
     "start": "node src/index.js",
     "once": "node src/index.js --once",
     "seed": "node src/index.js --seed",
+    "find-chat-id": "node scripts/find-chat-id.js",
     "test-telegram": "node src/index.js --test-telegram",
     "verify": "node scripts/verify-filters.js"
   }
