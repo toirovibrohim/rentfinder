@@ -1,6 +1,15 @@
 name: Watch joymee rentals
 
 on:
+  # Run on every push to main, so a change can be confirmed immediately.
+  # state.json is excluded, and the workflow's own commits say [skip ci],
+  # so saving state cannot trigger another run.
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'state.json'
+      - 'README.md'
+
   schedule:
     # Every 5 minutes — this is the shortest interval GitHub Actions allows.
     # Each run then checks the site once a minute while it is alive, so new
