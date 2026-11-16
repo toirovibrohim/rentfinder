@@ -1,7 +1,7 @@
 {
   "version": 1,
   "seeded": true,
-  "watermark": "2026-11-16T12:53:27.868Z",
+  "watermark": "2026-11-16T12:53:50.264Z",
   "seenIds": [
     542877,
     606814,
@@ -57,9 +57,13 @@
     535028,
     606884,
     606889,
-    606890
+    606890,
+    591234,
+    606891,
+    606772,
+    606892
   ],
-  "lastCheckedAt": "2026-11-16T12:58:25.022Z",
-  "lastNotifiedAt": "2026-11-16T12:54:01.491Z",
-  "totalNotified": 31
+  "lastCheckedAt": "2026-11-16T13:01:50.362Z",
+  "lastNotifiedAt": "2026-11-16T13:01:50.362Z",
+  "totalNotified": 35
 }
