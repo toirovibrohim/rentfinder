@@ -8,7 +8,7 @@
 
 import { loadConfig } from './config.js';
 import { applyCategoryFilter } from './categories.js';
-import { fetchListings } from './joymee.js';
+import { fetchListings, fetchListingDetail } from './joymee.js';
 import { TelegramClient } from './telegram.js';
 import { loadState, saveState, selectNewListings, recordSeen, makeIsKnown } from './state.js';
 
@@ -82,7 +82,10 @@ async function runCheck(config, telegram, { seedOnly = false } = {}) {
   let failures = 0;
   for (const listing of toSend) {
     try {
-      await telegram.sendListing(listing);
+      // Phone number, area, rooms and floor only exist on the detail endpoint,
+      // so they are fetched here — just for the few listings being sent.
+      const detail = await fetchListingDetail(listing.id);
+      await telegram.sendListing({ ...listing, ...detail });
       delivered.push(listing);
       console.log(`  sent #${listing.id} — ${listing.title.slice(0, 60)}`);
       await sleep(400); // stay under Telegram's per-chat rate limit

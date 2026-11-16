@@ -51,6 +51,38 @@ export function listingUrl(id) {
   return `${SITE_BASE}/announcements/${id}`;
 }
 
+/**
+ * Fetches the extra fields the search results leave out — phone number, floor
+ * area, room count, floor. One request per listing, so this is only done for
+ * listings that are about to be sent.
+ *
+ * Returns {} if the listing cannot be loaded; the notification still goes out
+ * with whatever the search results provided.
+ */
+export async function fetchListingDetail(id) {
+  try {
+    const data = await fetchJson(`${API_URL}${id}/`, { attempts: 2 });
+    const detail = data.detail || {};
+
+    const area = Number.parseFloat(detail.area_m2);
+    const rooms = Number.parseInt(detail.room_quantity, 10);
+    const floor = Number.parseInt(detail.floor_number, 10);
+    const floorsTotal = Number.parseInt(detail.floors_count, 10);
+
+    return {
+      phone: (data.phone_number || '').trim() || null,
+      areaM2: Number.isFinite(area) ? area : null,
+      rooms: Number.isFinite(rooms) ? rooms : null,
+      floor: Number.isFinite(floor) ? floor : null,
+      floorsTotal: Number.isFinite(floorsTotal) ? floorsTotal : null,
+      description: (data.description || '').trim() || null,
+    };
+  } catch (err) {
+    console.warn(`  could not load details for ${id}: ${err.message}`);
+    return {};
+  }
+}
+
 /** Normalises one API result into the shape the rest of the app uses. */
 function normalise(raw) {
   const pricing = raw.pricing || {};

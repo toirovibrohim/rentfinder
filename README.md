@@ -19,8 +19,18 @@ Each check it:
 
 1. fetches the newest listings for your filters,
 2. drops anything whose ID it has already sent (`state.json`),
-3. sends what is left to Telegram, oldest first,
-4. writes the updated `state.json` back to the repo.
+3. loads the full details of what is left,
+4. sends them to Telegram, oldest first,
+5. writes the updated `state.json` back to the repo.
+
+Each message carries the cover photo, price, room count, floor area, floor,
+address, publish time, the advertiser's name, a tappable phone number, and a
+link to the listing.
+
+The phone number, area, rooms and floor are not in the search results — they
+only exist on the per-listing detail endpoint. That costs one extra request per
+listing, so it is only done for listings that are actually being sent, not for
+everything scanned.
 
 ### Three things the site's API does that this works around
 

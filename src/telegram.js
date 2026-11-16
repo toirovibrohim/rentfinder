@@ -31,16 +31,47 @@ function formatPublished(listing) {
   }).format(new Date(listing.adsAtMs));
 }
 
+/** Rounds 54.00 -> "54", 54.50 -> "54.5". */
+function formatArea(areaM2) {
+  if (areaM2 === null || areaM2 === undefined || Number.isNaN(areaM2)) return null;
+  return `${Math.round(areaM2 * 10) / 10} m²`;
+}
+
+/** "3 rooms · 54 m² · floor 4/4" — whichever parts are known. */
+function formatSpecs(listing) {
+  const parts = [];
+  if (listing.rooms) parts.push(`${listing.rooms} ${listing.rooms === 1 ? 'room' : 'rooms'}`);
+
+  const area = formatArea(listing.areaM2);
+  if (area) parts.push(area);
+
+  if (listing.floor) {
+    parts.push(listing.floorsTotal ? `floor ${listing.floor}/${listing.floorsTotal}` : `floor ${listing.floor}`);
+  }
+
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
 export function buildMessage(listing) {
   const lines = [`🏠 <b>${escapeHtml(listing.title)}</b>`];
 
   const price = formatPrice(listing);
   if (price) lines.push(`💵 <b>${escapeHtml(price)}</b>`);
+
+  const specs = formatSpecs(listing);
+  if (specs) lines.push(`📐 ${escapeHtml(specs)}`);
+
   if (listing.address) lines.push(`📍 ${escapeHtml(listing.address)}`);
 
   const published = formatPublished(listing);
   if (published) lines.push(`🕒 ${escapeHtml(published)}`);
+
   if (listing.author) lines.push(`👤 ${escapeHtml(listing.author)}`);
+
+  // Telegram makes a tel: link tappable, so the number can be called directly.
+  if (listing.phone) {
+    lines.push(`📞 <a href="tel:${escapeHtml(listing.phone)}">${escapeHtml(listing.phone)}</a>`);
+  }
 
   lines.push('');
   lines.push(`<a href="${escapeHtml(listing.url)}">Open on joymee.uz</a>`);
