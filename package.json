@@ -1,0 +1,17 @@
+{
+  "name": "joymee-rent-watcher",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Watches a filtered joymee.uz search and pushes newly added rental listings to Telegram.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "once": "node src/index.js --once",
+    "seed": "node src/index.js --seed",
+    "test-telegram": "node src/index.js --test-telegram",
+    "verify": "node scripts/verify-filters.js"
+  }
+}

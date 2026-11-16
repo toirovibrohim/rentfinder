@@ -1,0 +1,11 @@
+.env
+node_modules/
+*.log
+
+# scratch files from development
+page.html
+api.json
+chunk_*.js
+c_*.js
+probe.js
+.state.json.tmp
