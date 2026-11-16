@@ -1,0 +1,6 @@
+# The workflow runs on Linux; keep LF so its shell steps are not broken by CRLF.
+* text=auto eol=lf
+*.yml text eol=lf
+*.js  text eol=lf
+*.md  text eol=lf
+*.json text eol=lf
