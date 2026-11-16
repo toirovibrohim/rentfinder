@@ -2,8 +2,11 @@ name: Watch joymee rentals
 
 on:
   # Run on every push to main, so a change can be confirmed immediately.
-  # state.json is excluded, and the workflow's own commits say [skip ci],
-  # so saving state cannot trigger another run.
+  # Saving state cannot retrigger this: state.json is excluded below, and the
+  # workflow's own state commits carry a skip-ci marker in their message.
+  #
+  # Careful when writing commit messages: GitHub reads that marker anywhere in
+  # the message, body included, so merely mentioning it skips the run.
   push:
     branches: [main]
     paths-ignore:
