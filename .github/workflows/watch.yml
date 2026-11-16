@@ -48,6 +48,7 @@ jobs:
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      SEARCH_URLS: ${{ vars.SEARCH_URLS }}
       SEARCH_URL: ${{ vars.SEARCH_URL }}
       # TEMPORARY: short runs so the self-chaining can be verified quickly.
       # Raise back to 25 once the chain is confirmed, so each run covers
@@ -85,10 +86,12 @@ jobs:
             fi
           done
 
-          if [ -n "$SEARCH_URL" ]; then
+          if [ -n "$SEARCH_URLS" ]; then
+            echo "SEARCH_URLS is set (${#SEARCH_URLS} characters)"
+          elif [ -n "$SEARCH_URL" ]; then
             echo "SEARCH_URL is set (${#SEARCH_URL} characters)"
           else
-            echo "::warning::Repository variable SEARCH_URL is not set; falling back to the built-in default search."
+            echo "::warning::Neither SEARCH_URLS nor SEARCH_URL is set; falling back to the built-in default searches."
           fi
 
           exit $missing

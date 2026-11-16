@@ -1,16 +1,22 @@
 #!/usr/bin/env node
 /**
- * joymee-rent-watcher
+ * rent-watcher
  *
- * Checks a filtered joymee.uz search on a schedule and sends every newly
- * published listing to Telegram, exactly once.
+ * Checks one or more filtered property searches on a schedule and sends
+ * every newly published listing to Telegram, exactly once.
  */
 
 import { loadConfig } from './config.js';
-import { applyCategoryFilter } from './categories.js';
-import { fetchListings, fetchListingDetail } from './joymee.js';
+import { sourceForUrl } from './sources/index.js';
 import { TelegramClient } from './telegram.js';
-import { loadState, saveState, selectNewListings, recordSeen, makeIsKnown } from './state.js';
+import {
+  loadState,
+  saveState,
+  sourceState,
+  selectNewListings,
+  recordSeen,
+  makeIsKnown,
+} from './state.js';
 
 const flags = new Set(process.argv.slice(2));
 
@@ -24,101 +30,137 @@ const stamp = () =>
     hour12: false,
   }).format(new Date());
 
-/**
- * One check: fetch, diff against state, notify, persist.
- * Returns true when at least one notification was sent.
- */
-async function runCheck(config, telegram, { seedOnly = false } = {}) {
-  let state = await loadState(config.statePath);
+/** Resolves each configured URL to its adapter and prepared query. */
+async function prepareSearches(config) {
+  const searches = [];
 
-  const { listings, filteredCount, pagesFetched } = await fetchListings(config.searchParams, {
+  for (const url of config.searchUrls) {
+    const source = sourceForUrl(url);
+    const search = await source.buildSearch(url);
+
+    console.log(`\n[${source.label}] ${url}`);
+    console.log(`  query: ${search.describe()}`);
+    for (const note of search.notes || []) console.log(`  note:  ${note}`);
+
+    searches.push({ source, search, url });
+  }
+
+  return searches;
+}
+
+/**
+ * Checks one source. Returns what it sent and whether it failed, leaving
+ * state updated in place.
+ */
+async function checkSource({ source, search }, config, state, telegram, { seedOnly }) {
+  const sourceSt = sourceState(state, source.name);
+
+  const { listings, filteredCount, pagesFetched } = await source.fetchListings(search, {
     pages: config.pagesToScan,
     maxPages: config.maxPagesToScan,
     // Seeding wants a snapshot, not a catch-up, so it never pages further.
-    isKnown: state.seeded && !seedOnly ? makeIsKnown(state) : null,
+    isKnown: sourceSt.seeded && !seedOnly ? makeIsKnown(sourceSt) : null,
   });
 
-  if (pagesFetched > config.pagesToScan) {
-    console.log(`[${stamp()}] went ${pagesFetched} pages deep — a burst of listings was posted`);
-  }
+  const tag = `[${source.label}]`;
 
   if (listings.length === 0) {
-    console.log(`[${stamp()}] no results returned — filters may be too narrow`);
-    await saveState(config.statePath, { ...state, lastCheckedAt: new Date().toISOString() });
+    console.log(`  ${tag} nothing matched the filters`);
     return { sent: 0, failed: 0 };
   }
 
-  // First ever run: remember everything currently listed without notifying,
-  // otherwise the first check would send hundreds of old ads.
-  if (!state.seeded || seedOnly) {
-    state = recordSeen(state, listings, { seenIdsToKeep: config.seenIdsToKeep });
-    state.seeded = true;
-    state.lastCheckedAt = new Date().toISOString();
-    await saveState(config.statePath, state);
+  if (pagesFetched > config.pagesToScan) {
+    console.log(`  ${tag} went ${pagesFetched} pages deep — a burst was posted`);
+  }
 
+  // First run for this source: remember what is already listed without
+  // notifying, otherwise the first check would send hundreds of old ads.
+  if (!sourceSt.seeded || seedOnly) {
+    recordSeen(sourceSt, listings, { seenIdsToKeep: config.seenIdsToKeep });
+    sourceSt.seeded = true;
     console.log(
-      `[${stamp()}] seeded with ${listings.length} existing listings ` +
-        `(${filteredCount ?? '?'} match the filter). Only ads posted from now on will be sent.`
+      `  ${tag} seeded with ${listings.length} listings (${filteredCount ?? '?'} match). Only new ads from now on.`
     );
     return { sent: 0, failed: 0 };
   }
 
-  const fresh = selectNewListings(listings, state);
-
+  const fresh = selectNewListings(listings, sourceSt);
   if (fresh.length === 0) {
-    state.lastCheckedAt = new Date().toISOString();
-    await saveState(config.statePath, state);
-    console.log(`[${stamp()}] no new listings (${listings.length} scanned)`);
+    console.log(`  ${tag} no new listings (${listings.length} scanned)`);
     return { sent: 0, failed: 0 };
   }
 
-  // Oldest first, so Telegram shows them in the order they were published.
+  // Oldest first, so Telegram shows them in publication order.
   const toSend = fresh.slice(0, config.maxNotificationsPerCheck).reverse();
-  const skipped = fresh.length - toSend.length;
+  const skipped = fresh.slice(config.maxNotificationsPerCheck);
 
-  console.log(`[${stamp()}] ${fresh.length} new listing(s) found`);
+  console.log(`  ${tag} ${fresh.length} new listing(s)`);
 
   const delivered = [];
   let failures = 0;
+
   for (const listing of toSend) {
     try {
-      // Phone number, area, rooms and floor only exist on the detail endpoint,
-      // so they are fetched here — just for the few listings being sent.
-      const detail = await fetchListingDetail(listing.id);
+      // Some sources keep phone, area and floor on a per-listing endpoint.
+      const detail = await source.fetchDetail(listing);
       await telegram.sendListing({ ...listing, ...detail });
       delivered.push(listing);
-      console.log(`  sent #${listing.id} — ${listing.title.slice(0, 60)}`);
+      console.log(`    sent ${listing.key} — ${listing.title.slice(0, 55)}`);
       await sleep(400); // stay under Telegram's per-chat rate limit
     } catch (err) {
       failures++;
-      console.error(`  FAILED #${listing.id}: ${err.message}`);
-      // Leave it unrecorded so the next check retries it.
+      console.error(`    FAILED ${listing.key}: ${err.message}`);
+      // Left unrecorded, so the next check retries it.
     }
   }
 
-  if (skipped > 0) {
-    const note =
-      `ℹ️ ${skipped} more new listing(s) matched but were not sent, to avoid flooding. ` +
-      `They will not be re-sent — open the search to see them.`;
+  if (skipped.length > 0) {
     try {
-      await telegram.sendText(note);
+      await telegram.sendText(
+        `ℹ️ ${skipped.length} more new listing(s) on ${source.label} matched but were not sent, ` +
+          `to avoid flooding. They will not be re-sent — open the search to see them.`
+      );
     } catch (err) {
-      console.error(`  could not send the overflow note: ${err.message}`);
+      console.error(`    could not send the overflow note: ${err.message}`);
     }
-    // Mark the skipped ones as handled so they do not pile up forever.
-    delivered.push(...fresh.slice(config.maxNotificationsPerCheck));
+    // Mark them handled so they do not pile up forever.
+    delivered.push(...skipped);
   }
 
   if (delivered.length > 0) {
-    state = recordSeen(state, delivered, { seenIdsToKeep: config.seenIdsToKeep });
-    state.lastNotifiedAt = new Date().toISOString();
-    state.totalNotified = (state.totalNotified || 0) + delivered.length;
+    recordSeen(sourceSt, delivered, { seenIdsToKeep: config.seenIdsToKeep });
+  }
+
+  return { sent: delivered.length, failed: failures };
+}
+
+/** One check across every configured source. */
+async function runCheck(searches, config, telegram, { seedOnly = false } = {}) {
+  const state = await loadState(config.statePath);
+
+  let sent = 0;
+  let failed = 0;
+
+  for (const entry of searches) {
+    try {
+      const result = await checkSource(entry, config, state, telegram, { seedOnly });
+      sent += result.sent;
+      failed += result.failed;
+    } catch (err) {
+      // One site being down must not stop the others.
+      failed++;
+      console.error(`  [${entry.source.label}] check failed: ${err.message}`);
+    }
   }
 
   state.lastCheckedAt = new Date().toISOString();
+  if (sent > 0) {
+    state.lastNotifiedAt = new Date().toISOString();
+    state.totalNotified = (state.totalNotified || 0) + sent;
+  }
   await saveState(config.statePath, state);
 
-  return { sent: delivered.length, failed: failures };
+  return { sent, failed };
 }
 
 async function main() {
@@ -128,28 +170,18 @@ async function main() {
   if (flags.has('--test-telegram')) {
     const me = await telegram.getMe();
     await telegram.sendText(
-      '✅ <b>Joymee rent watcher</b> is connected.\n' +
+      '✅ <b>Rent watcher</b> is connected.\n' +
         'You will get a message here whenever a new listing matches your filters.'
     );
     console.log(`Telegram OK — bot @${me.username}, test message sent to chat ${config.telegram.chatId}.`);
     return;
   }
 
-  // The API ignores entity_purpose/entity_type, so translate them into the
-  // `category` filter it does respect. Without this, daily rentals and sale
-  // listings leak into a long-term-rent search.
-  const category = await applyCategoryFilter(config.searchParams);
-  if (category.applied) {
-    console.log(`Deal type: category=${category.categories.join(',')} (from ${category.source})`);
-  } else {
-    console.warn(`Deal type not narrowed — ${category.reason}`);
-  }
-
-  console.log(`Watching: ${config.searchUrl}`);
-  console.log(`API query: ${config.searchParams.toString()}`);
+  const searches = await prepareSearches(config);
+  console.log('');
 
   if (flags.has('--seed')) {
-    await runCheck(config, telegram, { seedOnly: true });
+    await runCheck(searches, config, telegram, { seedOnly: true });
     return;
   }
 
@@ -157,34 +189,25 @@ async function main() {
 
   let totalSent = 0;
   let totalFailed = 0;
-  let checksFailed = 0;
 
   for (let i = 1; i <= iterations; i++) {
-    try {
-      const result = await runCheck(config, telegram);
-      totalSent += result.sent;
-      totalFailed += result.failed;
-    } catch (err) {
-      // A single failed check must not kill the run; the next one may succeed.
-      checksFailed++;
-      console.error(`[${stamp()}] check failed: ${err.message}`);
-    }
+    console.log(`[${stamp()}] check ${i}/${iterations}`);
+    const result = await runCheck(searches, config, telegram);
+    totalSent += result.sent;
+    totalFailed += result.failed;
 
     if (i < iterations) await sleep(config.pollIntervalSeconds * 1000);
   }
 
-  console.log(`Run finished: ${totalSent} sent, ${totalFailed} failed to send.`);
+  console.log(`\nRun finished: ${totalSent} sent, ${totalFailed} failure(s).`);
 
-  // Make the run go red so a broken token or chat id is noticed, rather than
-  // silently dropping listings every five minutes.
+  // Make the run go red so a broken token or a dead site is noticed, rather
+  // than listings being dropped quietly every few minutes.
   if (totalFailed > 0) {
     throw new Error(
-      `${totalFailed} listing(s) could not be delivered to Telegram. ` +
-        `Check TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID. They will be retried next run.`
+      `${totalFailed} failure(s) during this run. Check the log above. ` +
+        `Anything undelivered will be retried next run.`
     );
-  }
-  if (checksFailed === iterations) {
-    throw new Error(`All ${iterations} check(s) failed.`);
   }
 }
 

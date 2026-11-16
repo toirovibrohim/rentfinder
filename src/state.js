@@ -1,100 +1,120 @@
 /**
- * Remembers which listings have already been sent, so a restart or an
- * overlapping run never re-notifies the same apartment.
+ * Remembers which listings have already been sent, per source, so a restart
+ * or an overlapping run never re-notifies the same apartment.
  */
 
 import { readFile, writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
 
-const EMPTY_STATE = {
-  version: 1,
+const emptySource = () => ({
   seeded: false,
-  /** Publish time of the newest listing we have already handled. */
+  /** Publish time of the newest listing already handled, for this source. */
   watermark: null,
-  /** Recently seen listing IDs, newest last. */
+  /** Recently seen listing keys, oldest first. */
   seenIds: [],
+});
+
+const emptyState = () => ({
+  version: 2,
+  sources: {},
+  totalNotified: 0,
   lastCheckedAt: null,
   lastNotifiedAt: null,
-  totalNotified: 0,
-};
+});
+
+/**
+ * Version 1 held a single flat set of joymee ids. Those are promoted into the
+ * joymee source so an upgrade does not resend everything already notified.
+ */
+function migrate(parsed) {
+  if (parsed.version === 2 && parsed.sources) {
+    return { ...emptyState(), ...parsed };
+  }
+
+  const state = emptyState();
+  state.totalNotified = parsed.totalNotified || 0;
+  state.lastCheckedAt = parsed.lastCheckedAt || null;
+  state.lastNotifiedAt = parsed.lastNotifiedAt || null;
+  state.sources.joymee = {
+    seeded: Boolean(parsed.seeded),
+    watermark: parsed.watermark || null,
+    // v1 stored bare numeric ids; v2 keys are prefixed with the source.
+    seenIds: (Array.isArray(parsed.seenIds) ? parsed.seenIds : []).map((id) =>
+      String(id).includes(':') ? String(id) : `joymee:${id}`
+    ),
+  };
+  return state;
+}
 
 export async function loadState(statePath) {
   try {
     const raw = await readFile(statePath, 'utf8');
-    const parsed = JSON.parse(raw);
-    return {
-      ...EMPTY_STATE,
-      ...parsed,
-      seenIds: Array.isArray(parsed.seenIds) ? parsed.seenIds : [],
-    };
+    return migrate(JSON.parse(raw));
   } catch (err) {
-    if (err.code === 'ENOENT') return { ...EMPTY_STATE };
-    // A corrupt state file should not stop the watcher; start fresh but say so.
-    console.warn(`State file at ${statePath} is unreadable (${err.message}); starting fresh.`);
-    return { ...EMPTY_STATE };
+    if (err.code !== 'ENOENT') {
+      console.warn(`State file at ${statePath} is unreadable (${err.message}); starting fresh.`);
+    }
+    return emptyState();
   }
 }
 
 export async function saveState(statePath, state) {
   const dir = path.dirname(path.resolve(statePath));
   const tmp = path.join(dir, `.${path.basename(statePath)}.tmp`);
-  const json = JSON.stringify(state, null, 2) + '\n';
 
-  // Write then rename so an interrupted run cannot leave a half-written file.
-  await writeFile(tmp, json, 'utf8');
+  // Write then rename, so an interrupted run cannot leave a half-written file.
+  await writeFile(tmp, JSON.stringify(state, null, 2) + '\n', 'utf8');
   await rename(tmp, statePath);
 }
 
-/**
- * Picks out listings that have not been notified about yet.
- *
- * A listing counts as new when its ID has not been seen before. The watermark
- * is a second guard: once the remembered-ID list rolls over, an old listing
- * resurfacing in the results is not treated as new.
- */
-export function selectNewListings(listings, state) {
-  const isKnown = makeIsKnown(state);
-  return listings.filter((listing) => !isKnown(listing));
+export function sourceState(state, sourceName) {
+  if (!state.sources[sourceName]) state.sources[sourceName] = emptySource();
+  return state.sources[sourceName];
 }
 
 /**
- * Builds the "have we handled this already?" test, so paging can stop as soon
- * as a page holds nothing new.
+ * Builds the "have we handled this already?" test for one source, so paging
+ * can stop as soon as a page holds nothing new.
+ *
+ * A listing is known when its key has been seen before, or when it was
+ * published no later than the watermark. The watermark is the second guard:
+ * once the remembered-key list rolls over, an old listing resurfacing in the
+ * results is not treated as new.
  */
-export function makeIsKnown(state) {
-  const seen = new Set(state.seenIds);
-  const watermark = state.watermark ? Date.parse(state.watermark) : null;
+export function makeIsKnown(sourceSt) {
+  const seen = new Set(sourceSt.seenIds);
+  const watermark = sourceSt.watermark ? Date.parse(sourceSt.watermark) : null;
 
   return (listing) => {
-    if (seen.has(listing.id)) return true;
-    if (watermark !== null && listing.adsAtMs !== null && listing.adsAtMs <= watermark) {
-      return true;
-    }
+    if (seen.has(listing.key)) return true;
+    if (watermark !== null && listing.adsAtMs !== null && listing.adsAtMs <= watermark) return true;
     return false;
   };
 }
 
-/** Records listings as handled and advances the watermark. */
-export function recordSeen(state, listings, { seenIdsToKeep }) {
-  const seen = new Set(state.seenIds);
-  let watermarkMs = state.watermark ? Date.parse(state.watermark) : null;
+export function selectNewListings(listings, sourceSt) {
+  const isKnown = makeIsKnown(sourceSt);
+  return listings.filter((l) => !isKnown(l));
+}
 
+/** Records listings as handled for one source and advances its watermark. */
+export function recordSeen(sourceSt, listings, { seenIdsToKeep }) {
+  const known = new Set(sourceSt.seenIds);
+  let watermarkMs = sourceSt.watermark ? Date.parse(sourceSt.watermark) : null;
+
+  const added = [];
   for (const listing of listings) {
-    seen.add(listing.id);
+    if (!known.has(listing.key)) {
+      known.add(listing.key);
+      added.push(listing.key);
+    }
     if (listing.adsAtMs !== null && (watermarkMs === null || listing.adsAtMs > watermarkMs)) {
       watermarkMs = listing.adsAtMs;
     }
   }
 
-  // Keep insertion order (oldest first) and trim from the front.
-  const ordered = [...state.seenIds.filter((id) => seen.has(id))];
-  for (const id of seen) {
-    if (!ordered.includes(id)) ordered.push(id);
-  }
+  sourceSt.seenIds = [...sourceSt.seenIds, ...added].slice(-seenIdsToKeep);
+  if (watermarkMs !== null) sourceSt.watermark = new Date(watermarkMs).toISOString();
 
-  return {
-    ...state,
-    seenIds: ordered.slice(-seenIdsToKeep),
-    watermark: watermarkMs === null ? state.watermark : new Date(watermarkMs).toISOString(),
-  };
+  return sourceSt;
 }

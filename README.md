@@ -1,7 +1,8 @@
-# Joymee rent watcher
+# Rent watcher
 
-Watches a filtered [joymee.uz](https://joymee.uz) search and sends every **newly
-published** listing to your Telegram — once, never twice.
+Watches filtered property searches on [joymee.uz](https://joymee.uz) and
+[uybor.uz](https://uybor.uz), and sends every **newly published** listing to
+your Telegram — once, never twice.
 
 No dependencies, no database, no server to maintain. It runs on GitHub Actions
 for free and keeps working whether or not your PC is on.
@@ -10,32 +11,47 @@ for free and keeps working whether or not your PC is on.
 
 ## How it works
 
-The joymee.uz website loads its listings from a public JSON API at
-`api.joymee.uz/api/v1/announcement/`. The watcher calls that API directly with
-the exact filters from your search URL, so it sees the same apartments you do,
-without rendering a browser.
+Both sites load their listings from public JSON APIs. The watcher calls those
+directly with the filters from your search URLs, so it sees the same
+apartments you do, without rendering a browser.
 
-Each check it:
+Each check, for every search:
 
-1. fetches the newest listings for your filters,
-2. drops anything whose ID it has already sent (`state.json`),
-3. loads the full details of what is left,
-4. sends them to Telegram, oldest first,
+1. fetches the newest listings,
+2. drops anything whose key it has already sent (`state.json`),
+3. loads any missing details,
+4. sends what is left to Telegram, oldest first,
 5. writes the updated `state.json` back to the repo.
 
 Each message carries the cover photo, price, room count, floor area, floor,
-address, publish time, the advertiser's name, a tappable phone number, and a
-link to the listing.
+address, publish time, the advertiser's name where known, a tappable phone
+number, and a link to the listing on whichever site it came from.
 
-The phone number, area, rooms and floor are not in the search results — they
-only exist on the per-listing detail endpoint. That costs one extra request per
-listing, so it is only done for listings that are actually being sent, not for
-everything scanned.
+De-duplication is per source, with keys like `joymee:606422`, so the two
+sites can never collide.
 
-### Three things the site's API does that this works around
+### Adding a site
 
-These were found by testing the API, and each one would otherwise send you the
-wrong apartments:
+Each site is an adapter in `src/sources/` exposing `buildSearch`,
+`fetchListings` and `fetchDetail`. Register its hostnames in
+`src/sources/index.js` and add its URL to `SEARCH_URLS`.
+
+Before writing one, check the site is reachable from CI:
+
+```bash
+npm run probe-sites
+```
+
+Run it on a GitHub runner too, not just locally. **olx.uz and makler.uz were
+rejected this way** — OLX blocks datacenter IPs outright through CloudFront, so
+it works from a laptop and fails completely from Actions.
+
+### What each API does that this works around
+
+Both APIs accept filter parameters and silently ignore some of them, which is
+the dangerous kind of bug: you get results, they are just the wrong ones.
+
+**joymee.uz**
 
 - **`room_qty_min` / `room_qty_max` are silently ignored.** The API accepts
   them and returns the same results as no room filter at all — a 2–3 room
@@ -50,7 +66,19 @@ wrong apartments:
   they can be days old. Results are re-sorted by publish time before anything
   is compared, so a pinned old ad never looks new.
 
-Run `npm run verify` at any time to re-check all of this against the live site.
+**uybor.uz**
+
+- **`room__gte` / `room__lte` and `price__lte` do not filter.** Rooms are
+  stored as strings, and the price filter matches nothing at all. Both are
+  applied to the results instead, over fields the API already returns.
+- **`offset` and `skip` are accepted and ignored.** Paging is by `page`;
+  using `offset` returns page one every time, which quietly turns deeper
+  paging into the same request repeated.
+- Promoted listings are pinned to the top here too, so results are re-sorted
+  by publish time.
+
+Run `npm run verify` at any time to re-check all of this against both live
+sites. It drops each filter in turn and reports any that make no difference.
 
 ### Bursts
 
@@ -195,7 +223,7 @@ Under **Variables** → *New repository variable*:
 
 | Name | Value |
 | --- | --- |
-| `SEARCH_URL` | your filtered joymee.uz URL |
+| `SEARCH_URLS` | your filtered search URLs, comma- or newline-separated |
 
 ### 6. Turn it on
 
@@ -209,8 +237,8 @@ After that the schedule takes over. You can watch each run in the Actions tab.
 
 ## Changing what you watch
 
-Set the filters on joymee.uz, copy the URL from the address bar, and update the
-`SEARCH_URL` repository variable. Nothing else needs to change — every filter in
+Set the filters on the site, copy the URL from the address bar, and update
+the `SEARCH_URLS` repository variable. Nothing else needs to change — every filter in
 the URL is forwarded to the API as-is.
 
 After a big filter change, run the workflow once with mode `seed` so the new

@@ -1,8 +1,8 @@
 {
-  "name": "joymee-rent-watcher",
+  "name": "rent-watcher",
   "version": "1.0.0",
   "private": true,
-  "description": "Watches a filtered joymee.uz search and pushes newly added rental listings to Telegram.",
+  "description": "Watches filtered property searches on joymee.uz and uybor.uz, and pushes newly added listings to Telegram.",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -13,6 +13,7 @@
     "seed": "node src/index.js --seed",
     "find-chat-id": "node scripts/find-chat-id.js",
     "test-telegram": "node src/index.js --test-telegram",
-    "verify": "node scripts/verify-filters.js"
+    "verify": "node scripts/verify-filters.js",
+    "probe-sites": "node scripts/probe-sites.js"
   }
 }

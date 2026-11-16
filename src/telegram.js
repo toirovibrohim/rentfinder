@@ -74,7 +74,9 @@ export function buildMessage(listing) {
   }
 
   lines.push('');
-  lines.push(`<a href="${escapeHtml(listing.url)}">Open on joymee.uz</a>`);
+  lines.push(
+    `<a href="${escapeHtml(listing.url)}">Open on ${escapeHtml(listing.sourceLabel || 'the site')}</a>`
+  );
 
   return lines.join('\n');
 }
