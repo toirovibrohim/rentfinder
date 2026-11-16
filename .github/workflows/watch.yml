@@ -49,9 +49,10 @@ jobs:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       SEARCH_URL: ${{ vars.SEARCH_URL }}
-      # 25 checks, 60s apart. One run therefore covers 25 minutes on its own,
-      # which keeps the watcher alive through long gaps in GitHub's schedule.
-      POLL_ITERATIONS: '25'
+      # TEMPORARY: short runs so the self-chaining can be verified quickly.
+      # Raise back to 25 once the chain is confirmed, so each run covers
+      # 25 minutes and survives long gaps in GitHub's schedule.
+      POLL_ITERATIONS: '4'
       POLL_INTERVAL_SECONDS: '60'
       PAGES_TO_SCAN: '2'
 
