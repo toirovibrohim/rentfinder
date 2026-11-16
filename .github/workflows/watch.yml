@@ -56,6 +56,10 @@ jobs:
       PAGES_TO_SCAN: '2'
 
     steps:
+      - name: Note the start time
+        id: started
+        run: echo "at=$(date +%s)" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
@@ -121,3 +125,31 @@ jobs:
           done
 
           echo "::warning::Could not save state.json; some listings may be sent twice."
+
+      # Start the next run, so the watcher keeps going without waiting for the
+      # schedule. GitHub refuses to let a workflow trigger a workflow with the
+      # built-in token, so this needs a PAT in CHAIN_TOKEN. Without one the
+      # step does nothing and the schedule stays the only trigger.
+      #
+      # To stop the chain, delete the CHAIN_TOKEN secret.
+      - name: Start the next run
+        if: always() && (inputs.mode == '' || inputs.mode == 'check')
+        env:
+          GH_TOKEN: ${{ secrets.CHAIN_TOKEN }}
+          STARTED_AT: ${{ steps.started.outputs.at }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::notice::CHAIN_TOKEN is not set, so this run will not start a successor. Add it to make the watcher self-sustaining."
+            exit 0
+          fi
+
+          # If this run ended almost immediately something is broken, and
+          # chaining would spin in a tight loop. Stop instead.
+          elapsed=$(( $(date +%s) - STARTED_AT ))
+          if [ "$elapsed" -lt 120 ]; then
+            echo "::error::Run finished after only ${elapsed}s, which suggests it is failing immediately. Not starting another run — fix the failure, then push or run the workflow manually."
+            exit 0
+          fi
+
+          gh workflow run watch.yml --ref main
+          echo "Next run requested after ${elapsed}s."

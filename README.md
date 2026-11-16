@@ -72,6 +72,27 @@ site **4 times, 60 seconds apart**, then exits just before the next run starts.
 The practical result is a check roughly every minute, with occasional gaps when
 GitHub delays the schedule.
 
+### If the schedule never fires
+
+GitHub's scheduler is unreliable, and on a new repository it can refuse to
+start for hours while `push` and manual runs work perfectly. The fix is to let
+each run start the next one, so the watcher no longer depends on the schedule
+at all.
+
+GitHub blocks workflows from triggering workflows with the built-in token, so
+this needs a Personal Access Token:
+
+1. Create a **fine-grained** token at
+   [github.com/settings/personal-access-tokens](https://github.com/settings/personal-access-tokens/new)
+2. Scope it to this repository only
+3. Under *Repository permissions*, set **Actions** to **Read and write**
+4. Add it as a repository secret named `CHAIN_TOKEN`
+
+Each run then requests the next one as it finishes. Delete the secret to stop.
+
+If a run fails within two minutes, the chain deliberately stops rather than
+spinning — fix the problem, then push or run the workflow manually to restart.
+
 > **Make the repository public.** Public repos get unlimited free Actions
 > minutes. A private repo only gets 2,000 minutes/month, and this schedule uses
 > around 39,000. Nothing sensitive is in the repo — your bot token and chat ID
