@@ -40,14 +40,18 @@ permissions:
 jobs:
   watch:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Each run polls for ~25 minutes, so the site keeps being checked even
+    # when GitHub delays the schedule. Concurrency keeps at most one run
+    # going and one waiting, so these chain instead of piling up.
+    timeout-minutes: 35
 
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       SEARCH_URL: ${{ vars.SEARCH_URL }}
-      # 4 checks, 60s apart, keeps the run under the 5-minute cron interval.
-      POLL_ITERATIONS: '4'
+      # 25 checks, 60s apart. One run therefore covers 25 minutes on its own,
+      # which keeps the watcher alive through long gaps in GitHub's schedule.
+      POLL_ITERATIONS: '25'
       POLL_INTERVAL_SECONDS: '60'
       PAGES_TO_SCAN: '2'
 
