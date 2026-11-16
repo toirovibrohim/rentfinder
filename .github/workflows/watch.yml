@@ -91,9 +91,9 @@ jobs:
           done
 
           if [ -n "$SUBSCRIBER_KEY" ]; then
-            echo "Access control is on (SUBSCRIBER_KEY is set)"
+            echo "::notice::Access control is ON — the owner can approve other chats, and approvals expire."
           else
-            echo "Access control is off — only the owner is notified"
+            echo "::notice::Access control is OFF — only the owner is notified. Set SUBSCRIBER_KEY to enable it."
           fi
 
           if [ -n "$SEARCH_URLS" ]; then
