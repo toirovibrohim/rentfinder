@@ -235,6 +235,68 @@ After that the schedule takes over. You can watch each run in the Actions tab.
 
 ---
 
+## Letting other people receive listings
+
+By default only you are notified. You can also approve other people's chats —
+**only you can grant access, nobody can subscribe themselves**, and every
+approval expires (a day by default).
+
+### Turning it on
+
+Generate a key and add it as the repository secret `SUBSCRIBER_KEY`:
+
+```bash
+openssl rand -hex 32
+```
+
+That key encrypts the approved-chat list. The list is committed to the
+repository so access survives between runs, the repository is public, and a
+chat id identifies a real person — so it is only ever written as ciphertext.
+Without the secret, access control stays off and only you are notified.
+
+Optionally set the repository variable `ACCESS_HOURS` to change how long an
+approval lasts. The default is 24.
+
+### Using it
+
+Someone who wants access messages the bot. They are told their chat id and get
+nothing else; you get a notification with the command ready to copy:
+
+```
+👤 Access requested by Dilnoza
+chat id: 123456789
+
+Approve with:
+/approve 123456789
+```
+
+Your commands:
+
+| Command | What it does |
+| --- | --- |
+| `/approve <chat_id> [hours]` | Grant access, default `ACCESS_HOURS` |
+| `/revoke <chat_id>` | Remove access immediately |
+| `/list` | Who has access, and how long is left |
+| `/whoami` | Your own chat id |
+
+Anyone can send `/status` to see their own remaining time.
+
+Re-approving someone extends them from that moment, so `/approve 123 24` each
+morning keeps a person on a rolling daily window.
+
+### What is guaranteed
+
+- A listing is never sent to a chat you have not approved.
+- Access ends by itself. Forgetting to revoke someone is not a leak.
+- If someone blocks the bot, their access is dropped automatically.
+- Your own notifications never expire and cannot be revoked.
+- Commands are read on each check, so an approval takes effect within a minute.
+
+Messages sent to the bot while no run is active are not lost — Telegram holds
+them for 24 hours and the next run picks them up.
+
+---
+
 ## Changing what you watch
 
 Set the filters on the site, copy the URL from the address bar, and update
@@ -258,6 +320,7 @@ All optional, set as repository variables or in `.env`:
 | `POLL_INTERVAL_SECONDS` | `60` | Seconds between those checks. |
 | `MAX_NOTIFICATIONS_PER_CHECK` | `25` | Flood guard. Extras are counted, not sent. |
 | `SEEN_IDS_TO_KEEP` | `1000` | How many listing IDs to remember. |
+| `ACCESS_HOURS` | `24` | How long an approval lasts. |
 | `STATE_PATH` | `state.json` | Where the already-sent list is kept. |
 
 A run exits non-zero if a listing could not be delivered to Telegram, so a bad

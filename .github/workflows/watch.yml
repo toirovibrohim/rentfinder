@@ -48,6 +48,10 @@ jobs:
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      # Optional. Without it only the owner is notified; with it the owner can
+      # approve other chats, and the approved list is encrypted at rest.
+      SUBSCRIBER_KEY: ${{ secrets.SUBSCRIBER_KEY }}
+      ACCESS_HOURS: ${{ vars.ACCESS_HOURS }}
       SEARCH_URLS: ${{ vars.SEARCH_URLS }}
       SEARCH_URL: ${{ vars.SEARCH_URL }}
       # TEMPORARY: short runs so the self-chaining can be verified quickly.
@@ -86,6 +90,12 @@ jobs:
             fi
           done
 
+          if [ -n "$SUBSCRIBER_KEY" ]; then
+            echo "Access control is on (SUBSCRIBER_KEY is set)"
+          else
+            echo "Access control is off — only the owner is notified"
+          fi
+
           if [ -n "$SEARCH_URLS" ]; then
             echo "SEARCH_URLS is set (${#SEARCH_URLS} characters)"
           elif [ -n "$SEARCH_URL" ]; then
@@ -111,7 +121,7 @@ jobs:
       - name: Save what has been notified
         if: always()
         run: |
-          if [ -z "$(git status --porcelain state.json)" ]; then
+          if [ -z "$(git status --porcelain state.json subscribers.json)" ]; then
             echo "No state change to commit."
             exit 0
           fi
@@ -119,6 +129,7 @@ jobs:
           git config user.name  "joymee-watcher[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add state.json
+          if [ -f subscribers.json ]; then git add subscribers.json; fi
           git commit -m "chore: update watcher state [skip ci]" --quiet
 
           # Another run may have pushed while this one was polling.

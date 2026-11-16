@@ -106,8 +106,16 @@ export function loadConfig() {
 
     telegram: {
       botToken: requireEnv('TELEGRAM_BOT_TOKEN'),
+      /** The owner. Always receives listings, and is the only one who can grant access. */
       chatId: requireEnv('TELEGRAM_CHAT_ID'),
     },
+
+    /** Encrypts the approved-chat list, which is committed to a public repo. */
+    subscriberKey: process.env.SUBSCRIBER_KEY || '',
+    subscribersPath: process.env.SUBSCRIBERS_PATH || 'subscribers.json',
+
+    /** How long an approval lasts, in hours. */
+    accessHours: intEnv('ACCESS_HOURS', 24, { min: 1, max: 24 * 365 }),
 
     /** Result pages always read per check, per source. */
     pagesToScan: intEnv('PAGES_TO_SCAN', 2, { min: 1, max: 20 }),

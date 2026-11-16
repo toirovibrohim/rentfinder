@@ -10,6 +10,14 @@ import { loadConfig } from './config.js';
 import { sourceForUrl } from './sources/index.js';
 import { TelegramClient } from './telegram.js';
 import {
+  accessEnabled,
+  readSubscribers,
+  writeSubscribers,
+  processCommands,
+  recipients,
+  broadcastListing,
+} from './access.js';
+import {
   loadState,
   saveState,
   sourceState,
@@ -52,7 +60,7 @@ async function prepareSearches(config) {
  * Checks one source. Returns what it sent and whether it failed, leaving
  * state updated in place.
  */
-async function checkSource({ source, search }, config, state, telegram, { seedOnly }) {
+async function checkSource({ source, search }, config, state, telegram, ctx, { seedOnly }) {
   const sourceSt = sourceState(state, source.name);
 
   const { listings, filteredCount, pagesFetched } = await source.fetchListings(search, {
@@ -103,9 +111,13 @@ async function checkSource({ source, search }, config, state, telegram, { seedOn
     try {
       // Some sources keep phone, area and floor on a per-listing endpoint.
       const detail = await source.fetchDetail(listing);
-      await telegram.sendListing({ ...listing, ...detail });
+      await broadcastListing(telegram, { ...listing, ...detail }, ctx.chatIds, {
+        subscribers: ctx.subscribers,
+        onChange: () => { ctx.subscribersChanged = true; },
+      });
       delivered.push(listing);
-      console.log(`    sent ${listing.key} — ${listing.title.slice(0, 55)}`);
+      const to = ctx.chatIds.length > 1 ? ` → ${ctx.chatIds.length} chats` : '';
+      console.log(`    sent ${listing.key}${to} — ${listing.title.slice(0, 50)}`);
       await sleep(400); // stay under Telegram's per-chat rate limit
     } catch (err) {
       failures++;
@@ -116,10 +128,12 @@ async function checkSource({ source, search }, config, state, telegram, { seedOn
 
   if (skipped.length > 0) {
     try {
-      await telegram.sendText(
+      const note =
         `ℹ️ ${skipped.length} more new listing(s) on ${source.label} matched but were not sent, ` +
-          `to avoid flooding. They will not be re-sent — open the search to see them.`
-      );
+        `to avoid flooding. They will not be re-sent — open the search to see them.`;
+      for (const chatId of ctx.chatIds) {
+        await telegram.sendText(note, { to: chatId }).catch(() => {});
+      }
     } catch (err) {
       console.error(`    could not send the overflow note: ${err.message}`);
     }
@@ -137,13 +151,29 @@ async function checkSource({ source, search }, config, state, telegram, { seedOn
 /** One check across every configured source. */
 async function runCheck(searches, config, telegram, { seedOnly = false } = {}) {
   const state = await loadState(config.statePath);
+  const subscribers = await readSubscribers(config);
+
+  // Answer anyone who wrote in before deciding who this check's listings
+  // go to, so an approval granted a moment ago already counts.
+  const commands = await processCommands(telegram, config, state, subscribers);
+  if (commands.handled > 0) console.log(`  handled ${commands.handled} message(s)`);
+
+  const ctx = {
+    subscribers,
+    chatIds: recipients(config, subscribers),
+    subscribersChanged: commands.changed,
+  };
+
+  if (ctx.chatIds.length > 1) {
+    console.log(`  recipients: owner + ${ctx.chatIds.length - 1} approved`);
+  }
 
   let sent = 0;
   let failed = 0;
 
   for (const entry of searches) {
     try {
-      const result = await checkSource(entry, config, state, telegram, { seedOnly });
+      const result = await checkSource(entry, config, state, telegram, ctx, { seedOnly });
       sent += result.sent;
       failed += result.failed;
     } catch (err) {
@@ -160,6 +190,8 @@ async function runCheck(searches, config, telegram, { seedOnly = false } = {}) {
   }
   await saveState(config.statePath, state);
 
+  if (ctx.subscribersChanged) await writeSubscribers(config, subscribers);
+
   return { sent, failed };
 }
 
@@ -175,6 +207,13 @@ async function main() {
     );
     console.log(`Telegram OK — bot @${me.username}, test message sent to chat ${config.telegram.chatId}.`);
     return;
+  }
+
+  if (accessEnabled(config)) {
+    console.log(`Access control: on — approvals last ${config.accessHours}h`);
+  } else {
+    console.log('Access control: off — only the owner receives listings');
+    console.log('  (set SUBSCRIBER_KEY to let the owner approve other chats)');
   }
 
   const searches = await prepareSearches(config);

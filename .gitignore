@@ -9,3 +9,10 @@ chunk_*.js
 c_*.js
 probe.js
 .state.json.tmp
+
+# test artefacts (subscribers.json itself must stay tracked)
+test-subs.json
+test-subscribers.json
+test2.json
+test3.json
+test-state.json

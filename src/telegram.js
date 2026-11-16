@@ -133,9 +133,10 @@ export class TelegramClient {
     throw lastError;
   }
 
-  async sendText(text, { disablePreview = true } = {}) {
+  /** `to` defaults to the owner's chat. */
+  async sendText(text, { to = this.chatId, disablePreview = true } = {}) {
     return this.#call('sendMessage', {
-      chat_id: this.chatId,
+      chat_id: to,
       text,
       parse_mode: 'HTML',
       disable_web_page_preview: disablePreview,
@@ -143,26 +144,57 @@ export class TelegramClient {
   }
 
   /** Sends the listing photo with the details as a caption; falls back to text. */
-  async sendListing(listing) {
+  async sendListing(listing, { to = this.chatId } = {}) {
     const caption = buildMessage(listing);
 
     if (listing.image) {
       try {
         return await this.#call('sendPhoto', {
-          chat_id: this.chatId,
+          chat_id: to,
           photo: listing.image,
           caption,
           parse_mode: 'HTML',
         });
       } catch (err) {
-        console.warn(`  photo failed for ${listing.id} (${err.message}); sending as text`);
+        console.warn(`  photo failed for ${listing.key ?? listing.id} (${err.message}); sending as text`);
       }
     }
 
-    return this.sendText(caption, { disablePreview: false });
+    return this.sendText(caption, { to, disablePreview: false });
+  }
+
+  /**
+   * Fetches pending messages. `offset` must be one past the last update id
+   * already handled, which is how Telegram is told to forget them.
+   *
+   * Telegram keeps undelivered updates for 24 hours, so messages that arrive
+   * between runs are still picked up by the next one.
+   */
+  async getUpdates(offset, { limit = 100 } = {}) {
+    return this.#call(
+      'getUpdates',
+      {
+        ...(offset ? { offset } : {}),
+        limit,
+        timeout: 0,
+        allowed_updates: ['message'],
+      },
+      { attempts: 2 }
+    );
   }
 
   async getMe() {
     return this.#call('getMe', {}, { attempts: 1 });
   }
+}
+
+/** True when Telegram says this chat can no longer be written to. */
+export function isUnreachableChat(error) {
+  const m = String(error?.message || '').toLowerCase();
+  return (
+    m.includes('bot was blocked') ||
+    m.includes('user is deactivated') ||
+    m.includes('chat not found') ||
+    m.includes('bot was kicked')
+  );
 }

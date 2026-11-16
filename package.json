@@ -14,6 +14,7 @@
     "find-chat-id": "node scripts/find-chat-id.js",
     "test-telegram": "node src/index.js --test-telegram",
     "verify": "node scripts/verify-filters.js",
-    "probe-sites": "node scripts/probe-sites.js"
+    "probe-sites": "node scripts/probe-sites.js",
+    "test-access": "node scripts/test-access.js"
   }
 }
