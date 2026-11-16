@@ -55,6 +55,9 @@ jobs:
       POLL_ITERATIONS: '4'
       POLL_INTERVAL_SECONDS: '60'
       PAGES_TO_SCAN: '2'
+      # TEMPORARY: the test search matches the whole site, so keep the worst
+      # case small. Remove this line when the real filters come back.
+      MAX_NOTIFICATIONS_PER_CHECK: '5'
 
     steps:
       - name: Note the start time

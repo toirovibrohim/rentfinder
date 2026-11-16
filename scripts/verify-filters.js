@@ -6,17 +6,13 @@
  *   npm run verify
  */
 
-import { API_URL, buildSearchParams, loadDotEnv } from '../src/config.js';
+import { API_URL, DEFAULT_SEARCH_URL, buildSearchParams, loadDotEnv } from '../src/config.js';
 import { applyCategoryFilter } from '../src/categories.js';
 import { fetchListings } from '../src/joymee.js';
 
 loadDotEnv();
 
-const SEARCH_URL =
-  process.env.SEARCH_URL ||
-  'https://joymee.uz/?step=1&entity_purpose=long_term_rent&entity_type=apartment' +
-    '&district=199&region=59&currency=2&max_price=600&room_qty_min=2&room_qty_max=3' +
-    '&country=1&page=1';
+const SEARCH_URL = process.env.SEARCH_URL || DEFAULT_SEARCH_URL;
 
 async function countFor(params) {
   const res = await fetch(`${API_URL}?${params.toString()}`, {

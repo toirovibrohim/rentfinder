@@ -56,11 +56,22 @@ const PARAM_ALIASES = {
   room_qty_max: 'room_quantity_max',
 };
 
-/** Default search if SEARCH_URL is not set. */
-const DEFAULT_SEARCH_URL =
-  'https://joymee.uz/?step=1&entity_purpose=long_term_rent&entity_type=apartment' +
-  '&district=199&region=59&currency=2&max_price=600&room_qty_min=2&room_qty_max=3' +
-  '&country=1&page=1';
+/**
+ * Default search, used when the SEARCH_URL variable is not set.
+ *
+ * TEMPORARY: currently matches every new listing on the site, with no filters
+ * at all, so notifications can be seen arriving without waiting for a rare
+ * match. To go back to the real search, swap which of the two is commented.
+ */
+
+// Testing: everything posted to the site, any deal type, price or district.
+export const DEFAULT_SEARCH_URL = 'https://joymee.uz/?page=1';
+
+// The real search: long-term rent, apartments, Yunusobod, 2-3 rooms, up to 600 y.e.
+// export const DEFAULT_SEARCH_URL =
+//   'https://joymee.uz/?step=1&entity_purpose=long_term_rent&entity_type=apartment' +
+//   '&district=199&region=59&currency=2&max_price=600&room_qty_min=2&room_qty_max=3' +
+//   '&country=1&page=1';
 
 function requireEnv(name) {
   const value = process.env[name];
