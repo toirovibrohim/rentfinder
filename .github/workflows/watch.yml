@@ -151,5 +151,9 @@ jobs:
             exit 0
           fi
 
-          gh workflow run watch.yml --ref main
-          echo "Next run requested after ${elapsed}s."
+          if gh workflow run watch.yml --ref main; then
+            echo "Next run requested after ${elapsed}s."
+          else
+            echo "::error::Could not start the next run, so the watcher has stopped. CHAIN_TOKEN has most likely expired, or lost its Actions read-and-write permission. Renew it at https://github.com/settings/personal-access-tokens, update the CHAIN_TOKEN secret, then push any commit to restart."
+            exit 1
+          fi

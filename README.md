@@ -84,11 +84,18 @@ this needs a Personal Access Token:
 
 1. Create a **fine-grained** token at
    [github.com/settings/personal-access-tokens](https://github.com/settings/personal-access-tokens/new)
-2. Scope it to this repository only
-3. Under *Repository permissions*, set **Actions** to **Read and write**
-4. Add it as a repository secret named `CHAIN_TOKEN`
+2. Set **Expiration** to a custom date about a year out. The default is 30
+   days, and the chain stops the day it expires
+3. Scope it to this repository only
+4. Under *Repository permissions*, set **Actions** to **Read and write**
+5. Add it as a repository secret named `CHAIN_TOKEN`
 
 Each run then requests the next one as it finishes. Delete the secret to stop.
+
+**When the token expires** the watcher stops and the run goes red with a
+message saying so, so it fails loudly rather than going quiet. GitHub also
+emails you before the expiry date. To restart: renew the token, update the
+secret, and push any commit.
 
 If a run fails within two minutes, the chain deliberately stops rather than
 spinning — fix the problem, then push or run the workflow manually to restart.
