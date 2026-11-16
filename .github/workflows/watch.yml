@@ -46,6 +46,29 @@ jobs:
         with:
           node-version: '20'
 
+      # Names the exact missing setting, rather than failing later with a
+      # generic error buried in the log.
+      - name: Check configuration
+        run: |
+          missing=0
+          for name in TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID; do
+            value="${!name}"
+            if [ -z "$value" ]; then
+              echo "::error::Repository secret $name is missing or empty. Add it under Settings -> Secrets and variables -> Actions -> Secrets."
+              missing=1
+            else
+              echo "$name is set (${#value} characters)"
+            fi
+          done
+
+          if [ -n "$SEARCH_URL" ]; then
+            echo "SEARCH_URL is set (${#SEARCH_URL} characters)"
+          else
+            echo "::warning::Repository variable SEARCH_URL is not set; falling back to the built-in default search."
+          fi
+
+          exit $missing
+
       - name: Send a test message
         if: inputs.mode == 'test-telegram'
         run: node src/index.js --test-telegram

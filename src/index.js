@@ -190,5 +190,12 @@ async function main() {
 
 main().catch((err) => {
   console.error(`Fatal: ${err.message}`);
+
+  // Also emit it as a GitHub Actions annotation, so the reason shows on the
+  // run summary instead of only inside the log.
+  if (process.env.GITHUB_ACTIONS) {
+    console.log(`::error::${String(err.message).replace(/\r?\n/g, ' ')}`);
+  }
+
   process.exit(1);
 });
