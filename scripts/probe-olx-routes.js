@@ -129,3 +129,27 @@ if (working.length === 0) {
   console.log(`VERDICT: usable route(s): ${working.join(', ')}`);
   annotate('notice', `OLX reachable from here via: ${working.join(', ')}.`);
 }
+
+// A single success proves little when the site rate-limits. Watching once a
+// minute means the question is whether it holds up over repeated calls.
+const mobileApi = ROUTES.find((r) => r.name.includes('mobile UA'));
+if (working.some((w) => w.includes('mobile UA'))) {
+  console.log('\nReliability of the mobile-UA API over 8 calls, 10s apart:');
+  let ok = 0;
+  for (let i = 1; i <= 8; i++) {
+    const good = await tryRoute({ ...mobileApi, name: `  attempt ${String(i).padStart(2)}      ` });
+    if (good) ok++;
+    if (i < 8) await sleep(10000);
+  }
+
+  const rate = Math.round((ok / 8) * 100);
+  console.log(`\n  ${ok}/8 succeeded (${rate}%)`);
+
+  if (ok === 8) {
+    annotate('notice', `OLX mobile-UA API: 8/8 calls succeeded — reliable enough to watch.`);
+  } else if (ok >= 5) {
+    annotate('warning', `OLX mobile-UA API: only ${ok}/8 calls succeeded — usable but it will miss listings.`);
+  } else {
+    annotate('error', `OLX mobile-UA API: just ${ok}/8 calls succeeded — too unreliable to watch.`);
+  }
+}
