@@ -17,6 +17,7 @@ import {
   recipients,
   broadcastListing,
   backfillToday,
+  pollCommands,
 } from './access.js';
 import {
   loadState,
@@ -151,6 +152,29 @@ async function checkSource({ source, search }, config, state, telegram, ctx, { s
   return { sent: delivered.length, failed: failures };
 }
 
+/**
+ * Waits between listing checks, answering messages as they arrive.
+ *
+ * Listings are worth checking once a minute; somebody sending /start is not
+ * worth making wait that long, so the gap is spent polling for messages.
+ */
+async function waitHandlingCommands(ms, config, telegram) {
+  const until = Date.now() + ms;
+  const step = config.commandPollSeconds * 1000;
+
+  while (Date.now() < until) {
+    await sleep(Math.min(step, until - Date.now()));
+    if (Date.now() >= until) break;
+
+    try {
+      const handled = await pollCommands(telegram, config);
+      if (handled > 0) console.log(`  handled ${handled} message(s) between checks`);
+    } catch (err) {
+      console.warn(`  could not read messages: ${err.message}`);
+    }
+  }
+}
+
 /** One check across every configured source. */
 async function runCheck(searches, config, telegram, { seedOnly = false } = {}) {
   const state = await loadState(config.statePath);
@@ -261,7 +285,7 @@ async function main() {
       // timeout and be killed part-way.
       const elapsed = Date.now() - startedAt;
       const wait = Math.max(0, config.pollIntervalSeconds * 1000 - elapsed);
-      if (wait > 0) await sleep(wait);
+      await waitHandlingCommands(wait, config, telegram);
     }
   }
 

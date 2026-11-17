@@ -136,6 +136,12 @@ export function loadConfig() {
     pollIntervalSeconds: intEnv('POLL_INTERVAL_SECONDS', 60, { min: 10, max: 3600 }),
 
     /**
+     * Seconds between reading messages sent to the bot. Shorter than the
+     * listing interval, so an access request is not left waiting a minute.
+     */
+    commandPollSeconds: intEnv('COMMAND_POLL_SECONDS', 10, { min: 3, max: 300 }),
+
+    /**
      * Most listings one check will send. Anything beyond this is not dropped
      * — it is left unrecorded and goes out on the next check, a minute later.
      */

@@ -7,6 +7,7 @@
  */
 
 import { handleMessage, handleCallback } from './commands.js';
+import { loadState, saveState } from './state.js';
 import { isUnreachableChat } from './telegram.js';
 import {
   loadSubscribers,
@@ -252,4 +253,27 @@ export async function backfillToday(telegram, config, searches, subscribers, { o
   }
 
   return sent;
+}
+
+/**
+ * Answers messages without doing a full listing check.
+ *
+ * Listings are checked once a minute, but somebody sending /start should not
+ * wait that long to be dealt with, so this runs in between. It only touches
+ * the approved-chat list and the message cursor.
+ */
+export async function pollCommands(telegram, config) {
+  if (!accessEnabled(config)) return 0;
+
+  const state = await loadState(config.statePath);
+  const subscribers = await readSubscribers(config);
+
+  const { changed, handled } = await processCommands(telegram, config, state, subscribers);
+
+  if (handled > 0) {
+    await saveState(config.statePath, state);
+    if (changed) await writeSubscribers(config, subscribers);
+  }
+
+  return handled;
 }
