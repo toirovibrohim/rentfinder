@@ -991,7 +991,7 @@
     },
     "olx": {
       "seeded": true,
-      "watermark": "2026-11-17T19:35:19.000Z",
+      "watermark": "2026-11-17T20:34:56.000Z",
       "seenIds": [
         "olx:66801711",
         "olx:66801704",
@@ -1234,12 +1234,13 @@
         "olx:66811213",
         "olx:66811270",
         "olx:66811383",
-        "olx:66811498"
+        "olx:66811498",
+        "olx:66811726"
       ]
     }
   },
-  "totalNotified": 995,
-  "lastCheckedAt": "2026-11-17T20:47:55.670Z",
-  "lastNotifiedAt": "2026-11-17T19:48:47.426Z",
+  "totalNotified": 996,
+  "lastCheckedAt": "2026-11-17T21:13:00.095Z",
+  "lastNotifiedAt": "2026-11-17T20:49:44.497Z",
   "lastUpdateId": 940292024
 }
