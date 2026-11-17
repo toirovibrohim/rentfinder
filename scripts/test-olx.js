@@ -43,6 +43,11 @@ async function main() {
   check('category resolved', search.params.get('category_id') === '1147', search.params.get('category_id'));
   check('price not sent to the API', !search.params.has('filter_float_price:to'));
   check(
+    'not sorted by creation, which would hide bumped listings',
+    !search.params.has('sort_by'),
+    search.params.get('sort_by') || 'default order'
+  );
+  check(
     'price and rooms both checked here',
     search.clientFilters.length === 2,
     search.clientFilters.map((f) => f.describe).join('; ')

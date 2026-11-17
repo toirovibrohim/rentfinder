@@ -180,7 +180,15 @@ export function buildSearch(searchUrl) {
     notes.push(`rooms checked after fetching: ${[...wanted].join(', ')}`);
   }
 
-  params.set('sort_by', 'created_at:desc');
+  // Deliberately no sort_by.
+  //
+  // `created_at:desc` orders by when a listing was first written, and
+  // listings are judged new here by when they last surfaced. Those disagree:
+  // on one page of 65, a single listing had been created that day while 52
+  // had been bumped — and sorted by creation, page one held none of them.
+  // The default order is refresh-first, which is both what the site shows
+  // and what this needs.
+  notes.push('default order (most recently surfaced first)');
 
   return { params, clientFilters, notes, describe: () => params.toString() };
 }
