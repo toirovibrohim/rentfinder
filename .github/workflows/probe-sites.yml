@@ -8,6 +8,7 @@ on:
     paths:
       - 'scripts/probe-sites.js'
       - 'scripts/test-olx.js'
+      - 'scripts/probe-olx-funnel.js'
       - 'src/sources/olx.js'
       - '.github/workflows/probe-sites.yml'
   workflow_dispatch:
@@ -25,6 +26,10 @@ jobs:
 
       # The adapter can only be exercised here: OLX answers GitHub runners
       # but not this project's other egress.
+      - name: Where OLX listings are lost
+        if: always()
+        run: node scripts/probe-olx-funnel.js
+
       - name: OLX adapter against the live site
         if: always()
         run: node scripts/test-olx.js
