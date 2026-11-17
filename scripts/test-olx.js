@@ -83,10 +83,20 @@ async function main() {
     withRooms.every((l) => l.rooms === 2 || l.rooms === 3),
     [...new Set(withRooms.map((l) => l.rooms))].join(',')
   );
+  const usd = withPrice.filter((l) => l.currency === 'USD');
   check(
-    'price filter respected',
-    withPrice.every((l) => l.price <= 600),
-    `max ${Math.max(...withPrice.map((l) => l.price))}`
+    'price filter respected for USD listings',
+    usd.every((l) => l.price <= 600),
+    usd.length ? `max ${Math.max(...usd.map((l) => l.price))} USD of ${usd.length}` : 'none priced in USD'
+  );
+
+  // The price filter is ignored by the API, so it has to be applied here —
+  // which needs to know exactly how price and currency are reported.
+  const currencies = [...new Set(listings.map((l) => l.currency))];
+  annotate('notice', `OLX currencies seen: ${currencies.join(', ') || 'none'}`);
+  annotate(
+    'notice',
+    `OLX price samples: ${listings.slice(0, 6).map((l) => `${l.price} ${l.currency}`).join(' | ')}`
   );
 
   console.log('\nnewest 5:');

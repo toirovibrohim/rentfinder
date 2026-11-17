@@ -37,6 +37,31 @@ const DEFAULT_CATEGORY = CATEGORIES['arenda-dolgosrochnaya'];
 const PAGE_SIZE = 50;
 
 /**
+ * Price filters on this site are written in USD, matching how rents are
+ * quoted locally, but listings are posted in either USD or som.
+ */
+const PRICE_CURRENCY = 'USD';
+
+/**
+ * Som per dollar, for comparing a som-priced listing against a dollar limit.
+ * Approximate by nature — set OLX_UZS_PER_USD to keep it current. A listing
+ * near the limit may fall on the wrong side of it as the rate drifts.
+ */
+const UZS_PER_USD = Number.parseFloat(process.env.OLX_UZS_PER_USD || '') || 12600;
+
+/** A listing's price in USD, or null when it cannot be compared. */
+function toPriceCurrency(listing) {
+  if (listing.price === null || !Number.isFinite(listing.price)) return null;
+
+  const currency = (listing.currency || '').toUpperCase();
+  if (currency === 'USD') return listing.price;
+  if (currency === 'UZS' || currency === 'SUM' || currency === 'СУМ') {
+    return listing.price / UZS_PER_USD;
+  }
+  return null;
+}
+
+/**
  * OLX search URLs carry filters as `search[name]=value`, and the category in
  * the path. Price and currency are understood by the API; room counts come
  * back as an enum per listing, so those are checked against the results.
@@ -63,8 +88,22 @@ export function buildSearch(searchUrl) {
     if (!inner) continue;
     const key = inner[1];
 
+    // The API accepts the price filter and ignores it — listings far above
+    // the limit come back — so it is applied to the results instead.
     if (key === 'filter_float_price:from' || key === 'filter_float_price:to') {
-      params.set(key, value);
+      const bound = Number.parseFloat(value);
+      if (!Number.isFinite(bound)) continue;
+      const isMax = key.endsWith(':to');
+
+      clientFilters.push({
+        describe: `price ${isMax ? '<=' : '>='} ${bound} ${PRICE_CURRENCY}`,
+        test: (listing) => {
+          const amount = toPriceCurrency(listing);
+          if (amount === null) return true; // unpriced or unknown currency: keep
+          return isMax ? amount <= bound : amount >= bound;
+        },
+      });
+      notes.push(`price checked after fetching: ${isMax ? 'max' : 'min'} ${bound} ${PRICE_CURRENCY}`);
       continue;
     }
 
@@ -85,10 +124,6 @@ export function buildSearch(searchUrl) {
       test: (listing) => listing.rooms === null || wanted.has(String(listing.rooms)),
     });
     notes.push(`rooms checked after fetching: ${[...wanted].join(', ')}`);
-  }
-
-  if (!params.has('currency') && params.has('filter_float_price:to')) {
-    params.set('currency', 'USD');
   }
 
   params.set('sort_by', 'created_at:desc');
