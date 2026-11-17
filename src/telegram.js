@@ -31,6 +31,26 @@ function formatPublished(listing) {
   }).format(new Date(listing.adsAtMs));
 }
 
+/** Days between a listing first appearing and it surfacing again. */
+export function listingAgeDays(listing) {
+  if (!listing.postedAt || !listing.adsAtMs) return null;
+  const posted = Date.parse(listing.postedAt);
+  if (!Number.isFinite(posted)) return null;
+  return Math.floor((listing.adsAtMs - posted) / 86400000);
+}
+
+function formatAge(days) {
+  if (days >= 365) {
+    const years = Math.floor(days / 365);
+    return `${years} year${years === 1 ? '' : 's'}`;
+  }
+  if (days >= 30) {
+    const months = Math.floor(days / 30);
+    return `${months} month${months === 1 ? '' : 's'}`;
+  }
+  return `${days} days`;
+}
+
 /** Rounds 54.00 -> "54", 54.50 -> "54.5". */
 function formatArea(areaM2) {
   if (areaM2 === null || areaM2 === undefined || Number.isNaN(areaM2)) return null;
@@ -64,7 +84,14 @@ export function buildMessage(listing) {
   if (listing.address) lines.push(`📍 ${escapeHtml(listing.address)}`);
 
   const published = formatPublished(listing);
-  if (published) lines.push(`🕒 ${escapeHtml(published)}`);
+  if (published) {
+    // These sites re-promote rather than repost, so the time a listing
+    // surfaced can be today while the advert itself is old. Say so, rather
+    // than presenting a two-year-old listing as fresh.
+    const age = listingAgeDays(listing);
+    const note = age !== null && age >= 2 ? ` · reposted, first listed ${formatAge(age)} ago` : '';
+    lines.push(`🕒 ${escapeHtml(published)}${escapeHtml(note)}`);
+  }
 
   if (listing.author) lines.push(`👤 ${escapeHtml(listing.author)}`);
 

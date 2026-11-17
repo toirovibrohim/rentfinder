@@ -79,8 +79,16 @@ export function buildSearch(searchUrl) {
     ignored.push(key);
   }
 
-  // Newest first. Counter-intuitively this API treats `-createdAt` as oldest.
-  params.set('order', 'createdAt');
+  // Ordered by when a listing last surfaced, not when it was first written.
+  //
+  // Landlords here re-promote rather than repost: on one check, zero rent
+  // listings had been created that day while all fifty on page one had been
+  // bumped, some first posted in 2022. Going by creation time meant the site
+  // looked dead for a whole day while its front page was busy. joymee only
+  // exposes a bump time, so this also makes the three sites agree on what
+  // "new" means. De-duplication is by id, so a listing bumped repeatedly is
+  // still only ever sent once.
+  params.set('order', 'updatedAt');
 
   if (clientFilters.length > 0) {
     notes.push(`applied after fetching: ${clientFilters.map((f) => f.describe).join(', ')}`);
@@ -114,10 +122,15 @@ function normalise(raw) {
     title: (raw.description || '').trim().split('\n')[0].slice(0, 90) || 'Untitled listing',
     price: Number.isFinite(price) ? price : null,
     currency: (raw.priceCurrency || '').toUpperCase(),
+    // Often just a building number. uybor exposes a districtId too, but it
+    // sits in a different id space from the locations endpoint, which
+    // refuses to resolve it — so this is as specific as the data gets.
     address: (raw.address || '').trim(),
     image: cover?.url || null,
-    adsAt: raw.createdAt || null,
-    adsAtMs: raw.createdAt ? Date.parse(raw.createdAt) : null,
+    // When it last surfaced on the site — see the ordering note above.
+    adsAt: raw.updatedAt || raw.createdAt || null,
+    adsAtMs: Date.parse(raw.updatedAt || raw.createdAt || '') || null,
+    postedAt: raw.createdAt || null,
     author: null,
     isVip: Boolean(raw.isVip || raw.isPremium),
     url: `${SITE_BASE}/listing/${raw.id}`,

@@ -8,7 +8,7 @@
 
 import { loadConfig } from './config.js';
 import { sourceForUrl } from './sources/index.js';
-import { TelegramClient } from './telegram.js';
+import { TelegramClient, listingAgeDays } from './telegram.js';
 import {
   accessEnabled,
   readSubscribers,
@@ -94,7 +94,20 @@ async function checkSource({ source, search }, config, state, telegram, ctx, { s
     return { sent: 0, failed: 0 };
   }
 
-  const fresh = selectNewListings(listings, sourceSt);
+  let fresh = selectNewListings(listings, sourceSt);
+
+  if (config.maxListingAgeDays > 0) {
+    const before = fresh.length;
+    fresh = fresh.filter((listing) => {
+      const age = listingAgeDays(listing);
+      return age === null || age <= config.maxListingAgeDays;
+    });
+    const dropped = before - fresh.length;
+    if (dropped > 0) {
+      console.log(`  ${tag} ${dropped} reposted listing(s) older than ${config.maxListingAgeDays} days skipped`);
+    }
+  }
+
   if (fresh.length === 0) {
     console.log(`  ${tag} no new listings (${listings.length} scanned)`);
     return { sent: 0, failed: 0 };

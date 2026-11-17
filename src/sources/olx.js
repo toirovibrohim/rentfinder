@@ -205,9 +205,14 @@ function normalise(raw) {
 
   const photo = (raw.photos || [])[0]?.link || null;
 
-  // created_time is when it was first published; last_refresh_time changes
-  // when the seller bumps it, so the former is what "new" must mean.
-  const createdAt = raw.created_time || raw.last_refresh_time || null;
+  // When it last surfaced, not when it was first written.
+  //
+  // Sellers here re-promote rather than repost, and the other two sites are
+  // read the same way — joymee only exposes a bump time at all. Going by
+  // creation time made this source look far quieter than its own front page.
+  // De-duplication is by id, so a listing bumped repeatedly is still only
+  // ever sent once.
+  const createdAt = raw.last_refresh_time || raw.created_time || null;
 
   const city = raw.location?.city?.name || '';
   const district = raw.location?.district?.name || '';
@@ -224,6 +229,7 @@ function normalise(raw) {
     image: photo ? photo.replace('{width}x{height}', '800x600') : null,
     adsAt: createdAt,
     adsAtMs: createdAt ? Date.parse(createdAt) : null,
+    postedAt: raw.created_time || null,
     author: raw.user?.name?.trim() || null,
     // `business` distinguishes agencies from private sellers. Undefined
     // rather than false when absent, so an unknown is never taken as private.

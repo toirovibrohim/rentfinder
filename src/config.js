@@ -123,6 +123,16 @@ export function loadConfig() {
      */
     maxBackfillListings: intEnv('MAX_BACKFILL_LISTINGS', 30, { min: 1, max: 200 }),
 
+    /**
+     * Ignore listings first posted more than this many days ago, however
+     * recently they were re-promoted. 0 means no limit.
+     *
+     * These sites surface old adverts by bumping them, so without a limit a
+     * listing from 2022 can arrive looking like today's news. Only applies
+     * where the site reveals an original post date — joymee does not.
+     */
+    maxListingAgeDays: intEnv('MAX_LISTING_AGE_DAYS', 0, { min: 0, max: 3650 }),
+
     /** Result pages always read per check, per source. */
     pagesToScan: intEnv('PAGES_TO_SCAN', 2, { min: 1, max: 20 }),
 
