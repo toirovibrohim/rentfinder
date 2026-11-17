@@ -9,6 +9,7 @@ on:
       - 'scripts/probe-sites.js'
       - 'scripts/probe-olx-routes.js'
       - 'scripts/test-olx.js'
+      - 'scripts/probe-olx-params.js'
       - 'src/sources/olx.js'
       - '.github/workflows/probe-sites.yml'
   workflow_dispatch:
@@ -30,6 +31,10 @@ jobs:
 
       # The adapter can only be exercised here: OLX answers GitHub runners
       # but not this project's other egress.
+      - name: Which part of the OLX query is refused
+        if: always()
+        run: node scripts/probe-olx-params.js
+
       - name: OLX adapter against the live site
         if: always()
         run: node scripts/test-olx.js
