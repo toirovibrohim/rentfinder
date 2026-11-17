@@ -28,11 +28,18 @@ export async function fetchJson(url, { attempts = 3, referer, headers = {} } = {
       const text = await res.text();
 
       // A CDN block returns an HTML challenge page with a 2xx or 4xx status.
+      //
+      // This is worth retrying. Measuring one of these CDNs showed it
+      // refusing roughly one request in five at random — the same query
+      // succeeding and failing minutes apart — so treating a block as
+      // permanent throws away listings that a second attempt would get.
       if (text.trimStart().startsWith('<')) {
         const title = (text.match(/<title[^>]*>([^<]*)</i) || [])[1] || '';
-        throw new Error(
-          `blocked — got HTML instead of JSON (HTTP ${res.status}${title ? `, "${title.trim().slice(0, 40)}"` : ''}) (not retrying)`
+        const blocked = new Error(
+          `blocked by the site — got HTML instead of JSON (HTTP ${res.status}${title ? `, "${title.trim().slice(0, 40)}"` : ''})`
         );
+        blocked.blocked = true;
+        throw blocked;
       }
 
       if (!res.ok) {
@@ -46,7 +53,12 @@ export async function fetchJson(url, { attempts = 3, referer, headers = {} } = {
     } catch (err) {
       lastError = err;
       if (err.message?.includes('not retrying') || attempt === attempts) break;
-      await new Promise((r) => setTimeout(r, 1000 * attempt));
+
+      // Back off harder after a block than after a network blip, and add
+      // jitter so repeated runs do not line up into a pattern.
+      const base = err.blocked ? 2000 : 1000;
+      const wait = base * attempt + Math.floor(Math.random() * 500);
+      await new Promise((r) => setTimeout(r, wait));
     }
   }
 

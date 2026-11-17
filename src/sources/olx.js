@@ -157,9 +157,10 @@ export async function fetchListings(search, { pages = 1, maxPages = 12, isKnown 
     params.set('offset', String((page - 1) * PAGE_SIZE));
 
     const data = await fetchJson(`${API_URL}?${params.toString()}`, {
-      // One retry only. If the CDN is pushing back, hammering it is both
-      // rude and pointless — the next check is a minute away.
-      attempts: 2,
+      // The CDN refuses roughly one request in five at random, so a handful
+      // of spaced-out attempts is what makes this usable. It backs off
+      // between them rather than hammering.
+      attempts: 4,
       referer: `${SITE_BASE}/nedvizhimost/kvartiry/arenda-dolgosrochnaya/tashkent/`,
       headers: { 'User-Agent': MOBILE_UA },
     });
