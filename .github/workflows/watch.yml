@@ -54,15 +54,11 @@ jobs:
       ACCESS_HOURS: ${{ vars.ACCESS_HOURS }}
       SEARCH_URLS: ${{ vars.SEARCH_URLS }}
       SEARCH_URL: ${{ vars.SEARCH_URL }}
-      # TEMPORARY: short runs so the self-chaining can be verified quickly.
-      # Raise back to 25 once the chain is confirmed, so each run covers
-      # 25 minutes and survives long gaps in GitHub's schedule.
-      POLL_ITERATIONS: '4'
+      # 25 checks, 60s apart. One run therefore covers 25 minutes on its own,
+      # which keeps the watcher alive through long gaps in GitHub's schedule.
+      POLL_ITERATIONS: '25'
       POLL_INTERVAL_SECONDS: '60'
       PAGES_TO_SCAN: '2'
-      # TEMPORARY: the test search matches the whole site, so keep the worst
-      # case small. Remove this line when the real filters come back.
-      MAX_NOTIFICATIONS_PER_CHECK: '5'
 
     steps:
       - name: Note the start time

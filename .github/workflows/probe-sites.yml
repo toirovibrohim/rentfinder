@@ -7,11 +7,7 @@ on:
   push:
     paths:
       - 'scripts/probe-sites.js'
-      - 'scripts/probe-olx-routes.js'
       - 'scripts/test-olx.js'
-      - 'scripts/probe-olx-filters.js'
-      - 'scripts/probe-olx-seller.js'
-      - 'scripts/probe-olx-params.js'
       - 'src/sources/olx.js'
       - '.github/workflows/probe-sites.yml'
   workflow_dispatch:
@@ -29,10 +25,6 @@ jobs:
 
       # The adapter can only be exercised here: OLX answers GitHub runners
       # but not this project's other egress.
-      - name: Can the OLX private-seller filter be reproduced
-        if: always()
-        run: node scripts/probe-olx-seller.js
-
       - name: OLX adapter against the live site
         if: always()
         run: node scripts/test-olx.js

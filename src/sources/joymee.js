@@ -33,6 +33,9 @@ const UI_ONLY_PARAMS = new Set(['step', 'page', 'lang', 'locale']);
 const PARAM_ALIASES = {
   room_qty_min: 'room_quantity_min',
   room_qty_max: 'room_quantity_max',
+  // The website's "owner" switch. advertiser_type=1 is a private owner and
+  // 2 an agency — of 8,988 rentals, only 325 were type 1.
+  advertiser: 'advertiser_type',
 };
 
 const DEAL_TYPES = {

@@ -34,6 +34,23 @@ const CATEGORIES = {
 
 const DEFAULT_CATEGORY = CATEGORIES['arenda-dolgosrochnaya'];
 
+/**
+ * City from the path. Without one the API returns the whole country —
+ * Samarkand, Chirchik and Fergana come back alongside Tashkent.
+ */
+const CITIES = {
+  tashkent: 4,
+  toshkent: 4,
+  samarkand: 2,
+  andijan: 1,
+  bukhara: 3,
+  fergana: 5,
+  namangan: 7,
+  nukus: 8,
+  qarshi: 9,
+  urgench: 12,
+};
+
 const PAGE_SIZE = 50;
 
 /**
@@ -86,6 +103,14 @@ export function buildSearch(searchUrl) {
   params.set('category_id', String(category));
   notes.push(`category=${category}${categorySegment ? ` (${categorySegment})` : ' (default: long-term rent)'}`);
 
+  const citySegment = segments.find((s) => s in CITIES);
+  if (citySegment) {
+    params.set('city_id', String(CITIES[citySegment]));
+    notes.push(`city=${CITIES[citySegment]} (${citySegment})`);
+  } else {
+    notes.push('no city in the URL — the whole country is included');
+  }
+
   const rooms = [];
 
   for (const [rawKey, value] of parsed.searchParams.entries()) {
@@ -122,6 +147,27 @@ export function buildSearch(searchUrl) {
 
     if (key === 'city_id' || key === 'district_id' || key === 'region_id') {
       params.set(key, value);
+      continue;
+    }
+
+    // Every private-seller param returns the same count as no filter, so it
+    // is checked on the results. The ads carry a `business` flag, and most
+    // of them are agencies — in one sample, 44 of 51.
+    if (key === 'private_business' && value === 'private') {
+      clientFilters.push({
+        describe: 'private sellers only',
+        test: (listing) => listing.isBusiness === false,
+      });
+      notes.push('private sellers only, checked after fetching');
+      continue;
+    }
+
+    if (key === 'photos' && (value === '1' || value === 'true')) {
+      clientFilters.push({
+        describe: 'has at least one photo',
+        test: (listing) => Boolean(listing.image),
+      });
+      notes.push('listings with a photo only, checked after fetching');
     }
   }
 
@@ -179,6 +225,9 @@ function normalise(raw) {
     adsAt: createdAt,
     adsAtMs: createdAt ? Date.parse(createdAt) : null,
     author: raw.user?.name?.trim() || null,
+    // `business` distinguishes agencies from private sellers. Undefined
+    // rather than false when absent, so an unknown is never taken as private.
+    isBusiness: typeof raw.business === 'boolean' ? raw.business : null,
     isVip: Boolean(raw.promotion?.top_ad),
     url: raw.url || `${SITE_BASE}/d/obyavlenie/${raw.id}/`,
     rooms: Number.isFinite(rooms) ? rooms : null,

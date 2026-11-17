@@ -6,25 +6,22 @@ import { readFileSync } from 'node:fs';
  * Searches watched when SEARCH_URLS is not set. One URL per site, copied
  * from that site's address bar with the filters applied.
  *
- * TEMPORARY: joymee is currently unfiltered, so notifications can be seen
- * arriving without waiting for a rare match. Swap the commented line back
- * when that is no longer needed.
+ * All three are apartments for long-term rent in Tashkent, with no price or
+ * room limits. Private owners only where the site supports it — joymee and
+ * OLX do, uybor has no such filter and no way to tell from a listing, so it
+ * includes agencies.
  */
 export const DEFAULT_SEARCH_URLS = [
-  // Testing: everything posted to joymee, any deal type, price or district.
-  'https://joymee.uz/?page=1',
+  // joymee: long-term rent, apartments, Tashkent city, private owners.
+  'https://joymee.uz/?entity_purpose=long_term_rent&entity_type=apartment' +
+    '&region=59&advertiser=1',
 
-  // The real joymee search: long-term rent, apartments, Yunusobod,
-  // 2-3 rooms, up to 600 y.e.
-  // 'https://joymee.uz/?step=1&entity_purpose=long_term_rent&entity_type=apartment' +
-  //   '&district=199&region=59&currency=2&max_price=600&room_qty_min=2&room_qty_max=3' +
-  //   '&country=1&page=1',
+  // uybor: rent, apartments, Tashkent. No owner-only filter exists here.
+  'https://uybor.uz/listings?operationType__eq=rent&category__eq=7&region__eq=13',
 
-  // uybor: long-term rent, apartments.
-  'https://uybor.uz/listings?operationType__eq=rent&category__eq=7',
-
-  // olx: long-term rent, apartments, Tashkent.
-  'https://www.olx.uz/nedvizhimost/kvartiry/arenda-dolgosrochnaya/tashkent/',
+  // olx: long-term rent, apartments, Tashkent, private sellers, with photos.
+  'https://www.olx.uz/nedvizhimost/kvartiry/arenda-dolgosrochnaya/tashkent/' +
+    '?search%5Bprivate_business%5D=private&search%5Bphotos%5D=1',
 ];
 
 /**
