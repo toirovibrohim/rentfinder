@@ -140,7 +140,20 @@ export function loadConfig() {
     pagesToScan: intEnv('PAGES_TO_SCAN', 2, { min: 1, max: 20 }),
 
     /** Cap on adaptive paging when a burst of new listings is found. */
-    maxPagesToScan: intEnv('MAX_PAGES_TO_SCAN', 12, { min: 1, max: 50 }),
+    maxPagesToScan: intEnv('MAX_PAGES_TO_SCAN', 30, { min: 1, max: 100 }),
+
+    /**
+     * Every Nth check ignores the watermark and goes by remembered ids
+     * alone, to pick up anything never actually sent — after an outage, a
+     * cancelled run, or a bug. 0 turns it off.
+     *
+     * Paging still stops as soon as a page holds nothing unseen, so on a
+     * caught-up watcher this costs one extra page.
+     */
+    reconcileEveryChecks: intEnv('RECONCILE_EVERY_CHECKS', 10, { min: 0, max: 1000 }),
+
+    /** Warn in Telegram when the watcher was down for at least this long. */
+    gapWarningMinutes: intEnv('GAP_WARNING_MINUTES', 20, { min: 2, max: 10080 }),
 
     /** How many checks a single process performs before exiting. */
     pollIterations: intEnv('POLL_ITERATIONS', 1, { min: 1, max: 60 }),

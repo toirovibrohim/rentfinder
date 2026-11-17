@@ -81,15 +81,30 @@ export function sourceState(state, sourceName) {
  * once the remembered-key list rolls over, an old listing resurfacing in the
  * results is not treated as new.
  */
-export function makeIsKnown(sourceSt) {
+export function makeIsKnown(sourceSt, { ignoreWatermark = false } = {}) {
   const seen = new Set(sourceSt.seenIds);
   const watermark = sourceSt.watermark ? Date.parse(sourceSt.watermark) : null;
 
   return (listing) => {
     if (seen.has(listing.key)) return true;
+    if (ignoreWatermark) return false;
     if (watermark !== null && listing.adsAtMs !== null && listing.adsAtMs <= watermark) return true;
     return false;
   };
+}
+
+/**
+ * Selects listings never actually sent, going by remembered ids alone.
+ *
+ * The watermark is a shortcut: it assumes everything older has been dealt
+ * with. That holds while the watcher runs continuously, but an outage, a
+ * cancelled run or a bug can leave listings below it that were never sent,
+ * and nothing would ever look at them again. This ignores it, so a
+ * reconciliation pass can find them.
+ */
+export function selectUnsent(listings, sourceSt) {
+  const isKnown = makeIsKnown(sourceSt, { ignoreWatermark: true });
+  return listings.filter((l) => !isKnown(l));
 }
 
 export function selectNewListings(listings, sourceSt) {

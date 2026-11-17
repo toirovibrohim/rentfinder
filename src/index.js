@@ -24,6 +24,7 @@ import {
   saveState,
   sourceState,
   selectNewListings,
+  selectUnsent,
   recordSeen,
   makeIsKnown,
 } from './state.js';
@@ -62,14 +63,14 @@ async function prepareSearches(config) {
  * Checks one source. Returns what it sent and whether it failed, leaving
  * state updated in place.
  */
-async function checkSource({ source, search }, config, state, telegram, ctx, { seedOnly }) {
+async function checkSource({ source, search }, config, state, telegram, ctx, { seedOnly, reconcile = false }) {
   const sourceSt = sourceState(state, source.name);
 
   const { listings, filteredCount, pagesFetched } = await source.fetchListings(search, {
     pages: config.pagesToScan,
     maxPages: config.maxPagesToScan,
     // Seeding wants a snapshot, not a catch-up, so it never pages further.
-    isKnown: sourceSt.seeded && !seedOnly ? makeIsKnown(sourceSt) : null,
+    isKnown: sourceSt.seeded && !seedOnly ? makeIsKnown(sourceSt, { ignoreWatermark: reconcile }) : null,
   });
 
   const tag = `[${source.label}]`;
@@ -94,7 +95,15 @@ async function checkSource({ source, search }, config, state, telegram, ctx, { s
     return { sent: 0, failed: 0 };
   }
 
-  let fresh = selectNewListings(listings, sourceSt);
+  // A reconciliation pass goes by remembered ids alone, so it can see
+  // listings the watermark wrongly wrote off.
+  let fresh = reconcile
+    ? selectUnsent(listings, sourceSt)
+    : selectNewListings(listings, sourceSt);
+
+  if (reconcile && fresh.length > 0) {
+    console.log(`  ${tag} reconciliation found ${fresh.length} never sent`);
+  }
 
   if (config.maxListingAgeDays > 0) {
     const before = fresh.length;
@@ -215,7 +224,7 @@ async function waitHandlingCommands(ms, config, telegram) {
 }
 
 /** One check across every configured source. */
-async function runCheck(searches, config, telegram, { seedOnly = false } = {}) {
+async function runCheck(searches, config, telegram, { seedOnly = false, reconcile = false } = {}) {
   const state = await loadState(config.statePath);
   const subscribers = await readSubscribers(config);
 
@@ -239,7 +248,7 @@ async function runCheck(searches, config, telegram, { seedOnly = false } = {}) {
 
   for (const entry of searches) {
     try {
-      const result = await checkSource(entry, config, state, telegram, ctx, { seedOnly });
+      const result = await checkSource(entry, config, state, telegram, ctx, { seedOnly, reconcile });
       sent += result.sent;
       failed += result.failed;
     } catch (err) {
@@ -300,6 +309,25 @@ async function main() {
   const searches = await prepareSearches(config);
   console.log('');
 
+  // Say plainly when the watcher was not running. A gap is the one time
+  // listings can slip past reach entirely, and it is otherwise invisible.
+  try {
+    const previous = await loadState(config.statePath);
+    if (previous.lastCheckedAt) {
+      const gapMinutes = Math.round((Date.now() - Date.parse(previous.lastCheckedAt)) / 60000);
+      if (gapMinutes >= config.gapWarningMinutes) {
+        const message =
+          `⚠️ The watcher was not running for about <b>${gapMinutes} minutes</b>.\n` +
+          `It is back, and will re-check for anything posted in that window — ` +
+          `but a very long gap can push listings out of reach.`;
+        console.warn(`Gap of ${gapMinutes} minutes since the last check.`);
+        await telegram.sendText(message).catch(() => {});
+      }
+    }
+  } catch {
+    // A missing or unreadable state file is not worth failing the run over.
+  }
+
   if (flags.has('--seed')) {
     await runCheck(searches, config, telegram, { seedOnly: true });
     return;
@@ -311,10 +339,16 @@ async function main() {
   let totalFailed = 0;
 
   for (let i = 1; i <= iterations; i++) {
-    console.log(`[${stamp()}] check ${i}/${iterations}`);
+    // First check of a run always reconciles: a run begins after whatever
+    // gap preceded it, which is exactly when the watermark may have written
+    // off listings that were never sent.
+    const reconcile =
+      config.reconcileEveryChecks > 0 && (i === 1 || i % config.reconcileEveryChecks === 0);
+
+    console.log(`[${stamp()}] check ${i}/${iterations}${reconcile ? ' (reconciling)' : ''}`);
 
     const startedAt = Date.now();
-    const result = await runCheck(searches, config, telegram);
+    const result = await runCheck(searches, config, telegram, { reconcile });
     totalSent += result.sent;
     totalFailed += result.failed;
 

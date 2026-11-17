@@ -9,7 +9,7 @@
  *   node scripts/test-no-misses.js
  */
 
-import { recordSeen, makeIsKnown, selectNewListings } from '../src/state.js';
+import { recordSeen, makeIsKnown, selectNewListings, selectUnsent } from '../src/state.js';
 
 let failures = 0;
 
@@ -142,3 +142,34 @@ console.log('\nthe remembered-id list rolling over cannot resurface old listings
 
 console.log(failures === 0 ? '\nAll checks passed.\n' : `\n${failures} CHECK(S) FAILED.\n`);
 process.exitCode = failures === 0 ? 0 : 1;
+
+console.log('\nreconciliation finds listings the watermark wrote off');
+{
+  // A listing that was never sent but sits below the watermark — what an
+  // outage or a cancelled run leaves behind.
+  const source = {
+    seeded: true,
+    watermark: '2026-11-17T12:00:00Z',
+    seenIds: ['olx:already-sent'],
+  };
+  const stranded = at('2026-11-17T11:00:00Z');
+
+  check(
+    'a normal check cannot see it',
+    selectNewListings([stranded], source).length,
+    0,
+    'it is below the watermark, so it counts as handled'
+  );
+  check(
+    'reconciliation does see it',
+    selectUnsent([stranded], source).map((l) => l.key),
+    [stranded.key]
+  );
+
+  const sent = { key: 'olx:already-sent', adsAtMs: Date.parse('2026-11-17T11:30:00Z') };
+  check(
+    'and does not resend what was already sent',
+    selectUnsent([sent], source).length,
+    0
+  );
+}
