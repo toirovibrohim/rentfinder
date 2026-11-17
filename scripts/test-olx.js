@@ -24,7 +24,12 @@ const SEARCH =
 
 let failures = 0;
 const check = (label, ok, detail = '') => {
-  if (!ok) failures++;
+  if (!ok) {
+    failures++;
+    // Named individually, because the run log is not readable without
+    // repo-admin rights and "1 check failed" says nothing useful.
+    annotate('warning', `OLX check failed: ${label}${detail ? ` — ${detail}` : ''}`);
+  }
   console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${label}${detail ? ` — ${detail}` : ''}`);
 };
 
