@@ -22,6 +22,9 @@ export const DEFAULT_SEARCH_URLS = [
 
   // uybor: long-term rent, apartments.
   'https://uybor.uz/listings?operationType__eq=rent&category__eq=7',
+
+  // olx: long-term rent, apartments, Tashkent.
+  'https://www.olx.uz/nedvizhimost/kvartiry/arenda-dolgosrochnaya/tashkent/',
 ];
 
 /**

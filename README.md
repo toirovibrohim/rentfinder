@@ -1,8 +1,8 @@
 # Rent watcher
 
-Watches filtered property searches on [joymee.uz](https://joymee.uz) and
-[uybor.uz](https://uybor.uz), and sends every **newly published** listing to
-your Telegram — once, never twice.
+Watches filtered property searches on [joymee.uz](https://joymee.uz),
+[uybor.uz](https://uybor.uz) and [olx.uz](https://www.olx.uz), and sends every
+**newly published** listing to your Telegram — once, never twice.
 
 No dependencies, no database, no server to maintain. It runs on GitHub Actions
 for free and keeps working whether or not your PC is on.
@@ -42,9 +42,9 @@ Before writing one, check the site is reachable from CI:
 npm run probe-sites
 ```
 
-Run it on a GitHub runner too, not just locally. **olx.uz and makler.uz were
-rejected this way** — OLX blocks datacenter IPs outright through CloudFront, so
-it works from a laptop and fails completely from Actions.
+Run it on a GitHub runner too, not just locally — a site can answer one and
+refuse the other. **makler.uz was rejected this way**: it does not respond at
+all, from anywhere.
 
 ### What each API does that this works around
 
@@ -65,6 +65,25 @@ the dangerous kind of bug: you get results, they are just the wrong ones.
 - **Promoted ("VIP") ads are pinned to the top** regardless of sort order, and
   they can be days old. Results are re-sorted by publish time before anything
   is compared, so a pinned old ad never looks new.
+
+**olx.uz**
+
+- **Its CDN refuses about one request in five, at random.** The same query
+  succeeds and fails minutes apart, so a block is retried with backoff rather
+  than treated as permanent. Four attempts take a one-in-five refusal rate to
+  under one in a thousand.
+- **It also refuses a desktop browser string from datacenter ranges** while
+  answering a mobile one, so the adapter sends a mobile string. The site's
+  robots.txt permits this endpoint; only `users/me`, `page-views`,
+  `suggested`, `targeting` and `offers/metadata` are disallowed, and none
+  are touched.
+- **`filter_float_price:to` is accepted and ignored** — a 600 limit returned
+  a listing at 3,800,000 — so price is checked against the results.
+- **Prices come in two currencies**, dollars (reported as `UYE`, for "у.е.")
+  and som. Som prices are converted before comparing, at a rate set with
+  `OLX_UZS_PER_USD`.
+- **`created_time` is used, not `last_refresh_time`**, so a seller bumping
+  an old advert does not look like a new listing.
 
 **uybor.uz**
 
