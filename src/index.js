@@ -117,12 +117,16 @@ async function checkSource({ source, search }, config, state, telegram, ctx, { s
   // Everything new gets sent. When a burst is bigger than one check should
   // push at Telegram in one go, the remainder is simply left unrecorded and
   // picked up by the next check — never dropped, and never announced.
+  // `fresh` is newest first, so the cap keeps the newest and defers the
+  // oldest. Those deferred ones must be kept, not just counted: the
+  // watermark has to be held below them or they would be treated as
+  // handled and never sent.
   const toSend = fresh.slice(0, config.maxNotificationsPerCheck).reverse();
-  const deferred = fresh.length - toSend.length;
+  const deferred = fresh.slice(config.maxNotificationsPerCheck);
 
   console.log(
     `  ${tag} ${fresh.length} new listing(s)` +
-      (deferred > 0 ? ` — sending ${toSend.length}, ${deferred} on the next check` : '')
+      (deferred.length > 0 ? ` — sending ${toSend.length}, ${deferred.length} on the next check` : '')
   );
 
   const delivered = [];
@@ -161,20 +165,26 @@ async function checkSource({ source, search }, config, state, telegram, ctx, { s
   }
 
   if (delivered.length > 0) {
-    // Hold the watermark below anything that failed, or a newer sibling
-    // would bury it and the retry would never happen.
-    const oldestFailure = failed
+    // Hold the watermark below anything still owed — whether it failed to
+    // send or was deferred past this check's cap. Everything at or below the
+    // watermark counts as handled, so without this a newer sibling buries
+    // them and they are never sent at all.
+    const pending = [...failed, ...deferred];
+    const oldestPending = pending
       .map((l) => l.adsAtMs)
       .filter((ms) => typeof ms === 'number')
       .sort((a, b) => a - b)[0];
 
     recordSeen(sourceSt, delivered, {
       seenIdsToKeep: config.seenIdsToKeep,
-      notBeyond: oldestFailure ?? null,
+      notBeyond: oldestPending ?? null,
     });
 
-    if (oldestFailure) {
-      console.log(`  ${tag} watermark held back for ${failed.length} retry(s)`);
+    if (oldestPending) {
+      console.log(
+        `  ${tag} watermark held back for ${pending.length} still owed ` +
+          `(${failed.length} failed, ${deferred.length} deferred)`
+      );
     }
   }
 

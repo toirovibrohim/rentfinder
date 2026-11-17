@@ -101,14 +101,28 @@ console.log('\na blocked fetch delays rather than skips');
 
 console.log('\nlistings deferred past the per-check cap stay pending');
 {
-  const source = { seeded: true, watermark: '2026-11-17T09:00:00Z', seenIds: [] };
+  // The cap keeps the NEWEST and defers the OLDEST, so a deferred listing
+  // always sits below the watermark the sent ones would set. An earlier
+  // version of this test had it the other way round and so proved nothing.
   const sent = at('2026-11-17T10:05:00Z');
-  const deferred = at('2026-11-17T10:06:00Z'); // newer, not sent this time
+  const deferredOlder = at('2026-11-17T10:01:00Z');
 
-  // Only what was sent is recorded, and the deferred one is newer, so the
-  // watermark cannot bury it.
-  recordSeen(source, [sent], { seenIdsToKeep: 100, notBeyond: null });
-  check('deferred listing still pending', selectNewListings([deferred], source).length, 1);
+  const guarded = { seeded: true, watermark: '2026-11-17T09:00:00Z', seenIds: [] };
+  recordSeen(guarded, [sent], { seenIdsToKeep: 100, notBeyond: deferredOlder.adsAtMs });
+  check(
+    'deferred listing still pending',
+    selectNewListings([deferredOlder], guarded).map((l) => l.key),
+    [deferredOlder.key]
+  );
+
+  const unguarded = { seeded: true, watermark: '2026-11-17T09:00:00Z', seenIds: [] };
+  recordSeen(unguarded, [sent], { seenIdsToKeep: 100 });
+  check(
+    'without the guard it would be lost',
+    selectNewListings([deferredOlder], unguarded).length,
+    0,
+    'the watermark jumps past it and it is never sent'
+  );
 }
 
 console.log('\nthe remembered-id list rolling over cannot resurface old listings');
