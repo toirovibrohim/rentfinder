@@ -122,6 +122,25 @@ async function main() {
     `OLX price samples: ${listings.slice(0, 6).map((l) => `${l.price} ${l.currency}`).join(' | ')}`
   );
 
+  // The age cutoff is what keeps re-promoted adverts out. OLX bumps
+  // listings first posted years ago, so this confirms the dates needed to
+  // spot them are actually present and parsed.
+  const withPostedAt = listings.filter((l) => l.postedAt);
+  check('original post date present', withPostedAt.length === listings.length, `${withPostedAt.length}/${listings.length}`);
+
+  const ages = withPostedAt
+    .map((l) => Math.floor((l.adsAtMs - Date.parse(l.postedAt)) / 86400000))
+    .filter((n) => Number.isFinite(n));
+
+  if (ages.length > 0) {
+    const fresh = ages.filter((a) => a <= 1).length;
+    annotate(
+      'notice',
+      `OLX ages: ${fresh}/${ages.length} posted within a day; oldest ${Math.max(...ages)} days, median ${ages.sort((a, b) => a - b)[Math.floor(ages.length / 2)]} days`
+    );
+    check('ages are computable', ages.every((a) => a >= 0), `min ${Math.min(...ages)}`);
+  }
+
   console.log('\nnewest 5:');
   for (const l of listings.slice(0, 5)) {
     const when = l.adsAt ? l.adsAt.slice(0, 16).replace('T', ' ') : '—';
