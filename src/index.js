@@ -126,6 +126,7 @@ async function checkSource({ source, search }, config, state, telegram, ctx, { s
   );
 
   const delivered = [];
+  const failed = [];
   let failures = 0;
   let sentInBatch = 0;
 
@@ -153,13 +154,28 @@ async function checkSource({ source, search }, config, state, telegram, ctx, { s
       }
     } catch (err) {
       failures++;
+      failed.push(listing);
       console.error(`    FAILED ${listing.key}: ${err.message}`);
       // Left unrecorded, so the next check retries it.
     }
   }
 
   if (delivered.length > 0) {
-    recordSeen(sourceSt, delivered, { seenIdsToKeep: config.seenIdsToKeep });
+    // Hold the watermark below anything that failed, or a newer sibling
+    // would bury it and the retry would never happen.
+    const oldestFailure = failed
+      .map((l) => l.adsAtMs)
+      .filter((ms) => typeof ms === 'number')
+      .sort((a, b) => a - b)[0];
+
+    recordSeen(sourceSt, delivered, {
+      seenIdsToKeep: config.seenIdsToKeep,
+      notBeyond: oldestFailure ?? null,
+    });
+
+    if (oldestFailure) {
+      console.log(`  ${tag} watermark held back for ${failed.length} retry(s)`);
+    }
   }
 
   return { sent: delivered.length, failed: failures };

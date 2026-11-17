@@ -97,8 +97,15 @@ export function selectNewListings(listings, sourceSt) {
   return listings.filter((l) => !isKnown(l));
 }
 
-/** Records listings as handled for one source and advances its watermark. */
-export function recordSeen(sourceSt, listings, { seenIdsToKeep }) {
+/**
+ * Records listings as handled for one source and advances its watermark.
+ *
+ * `notBeyond` is the publish time of the oldest listing that failed to send.
+ * The watermark stops just short of it, because anything at or below the
+ * watermark counts as known: without this, one failed send among several
+ * successes would be buried by its newer siblings and never retried.
+ */
+export function recordSeen(sourceSt, listings, { seenIdsToKeep, notBeyond = null }) {
   const known = new Set(sourceSt.seenIds);
   let watermarkMs = sourceSt.watermark ? Date.parse(sourceSt.watermark) : null;
 
@@ -111,6 +118,10 @@ export function recordSeen(sourceSt, listings, { seenIdsToKeep }) {
     if (listing.adsAtMs !== null && (watermarkMs === null || listing.adsAtMs > watermarkMs)) {
       watermarkMs = listing.adsAtMs;
     }
+  }
+
+  if (notBeyond !== null && watermarkMs !== null && watermarkMs >= notBeyond) {
+    watermarkMs = notBeyond - 1;
   }
 
   sourceSt.seenIds = [...sourceSt.seenIds, ...added].slice(-seenIdsToKeep);

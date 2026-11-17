@@ -278,16 +278,18 @@ export async function fetchListings(search, { pages = 1, maxPages = 12, isKnown 
     }
 
     const raw = Array.isArray(data.data) ? data.data : [];
-    const batch = raw
-      .filter((a) => a && typeof a.id !== 'undefined')
-      .map(normalise)
-      .filter((listing) => search.clientFilters.every((f) => f.test(listing)));
+    const onPage = raw.filter((a) => a && typeof a.id !== 'undefined').map(normalise);
+    const batch = onPage.filter((listing) => search.clientFilters.every((f) => f.test(listing)));
 
     collected.push(...batch);
 
     if (raw.length < PAGE_SIZE) break;
     if (page < pages) continue;
-    if (!isKnown || batch.every((l) => isKnown(l))) break;
+    // Judged on the whole page, not the filtered subset. Most listings are
+    // filtered out here, so a page can easily yield nothing while deeper
+    // pages still hold new ones — and [].every() is true, which would stop
+    // paging exactly when it should continue.
+    if (!isKnown || onPage.every((l) => isKnown(l))) break;
   }
 
   return { listings: dedupeAndSort(collected), filteredCount, pagesFetched };

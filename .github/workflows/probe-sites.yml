@@ -8,6 +8,8 @@ on:
     paths:
       - 'scripts/probe-sites.js'
       - 'scripts/test-olx.js'
+      - 'scripts/test-no-misses.js'
+      - 'src/state.js'
       - 'scripts/probe-olx-funnel.js'
       - 'src/sources/olx.js'
       - '.github/workflows/probe-sites.yml'
@@ -22,6 +24,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: npm test
+
       - run: node scripts/probe-sites.js
 
       # The adapter can only be exercised here: OLX answers GitHub runners

@@ -164,10 +164,8 @@ export async function fetchListings(search, { pages = 1, maxPages = 12, isKnown 
     if (filteredCount === null) filteredCount = data.total ?? null;
 
     const raw = Array.isArray(data.results) ? data.results : [];
-    const batch = raw
-      .filter((r) => r && typeof r.id !== 'undefined')
-      .map(normalise)
-      .filter((listing) => search.clientFilters.every((f) => f.test(listing)));
+    const onPage = raw.filter((r) => r && typeof r.id !== 'undefined').map(normalise);
+    const batch = onPage.filter((listing) => search.clientFilters.every((f) => f.test(listing)));
 
     collected.push(...batch);
 
@@ -175,7 +173,11 @@ export async function fetchListings(search, { pages = 1, maxPages = 12, isKnown 
     // legitimately filter down to nothing while more results remain.
     if (raw.length < PAGE_SIZE) break;
     if (page < pages) continue;
-    if (!isKnown || batch.every((l) => isKnown(l))) break;
+    // Judged on the whole page, not the filtered subset. Most listings are
+    // filtered out here, so a page can easily yield nothing while deeper
+    // pages still hold new ones — and [].every() is true, which would stop
+    // paging exactly when it should continue.
+    if (!isKnown || onPage.every((l) => isKnown(l))) break;
   }
 
   return { listings: dedupeAndSort(collected), filteredCount, pagesFetched };

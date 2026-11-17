@@ -199,14 +199,15 @@ export async function fetchListings(search, { pages = 1, maxPages = 12, isKnown 
 
     if (filteredCount === null) filteredCount = data.filtered_count ?? null;
 
-    const batch = (Array.isArray(data.results) ? data.results : [])
+    const onPage = (Array.isArray(data.results) ? data.results : [])
       .filter((raw) => raw && typeof raw.id !== 'undefined')
       .map(normalise);
+    const batch = onPage;
     collected.push(...batch);
 
     if (!data.next || batch.length === 0) break;
     if (page < pages) continue;
-    if (!isKnown || batch.every((l) => isKnown(l))) break;
+    if (!isKnown || onPage.every((l) => isKnown(l))) break;
   }
 
   return { listings: dedupeAndSort(collected), filteredCount, pagesFetched };
