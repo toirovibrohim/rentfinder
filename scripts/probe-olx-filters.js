@@ -63,15 +63,21 @@ function summarise(body) {
 async function probe(label, query) {
   const body = await ask(query);
   if (!body) {
-    console.log(`  ${label.padEnd(36)} blocked after retries`);
+    const line = `${label}: blocked after retries`;
+    console.log(`  ${line}`);
+    annotate('warning', `OLX filter — ${line}`);
     return null;
   }
   const s = summarise(body);
-  console.log(
-    `  ${label.padEnd(36)} total=${String(s.total).padStart(6)} n=${String(s.n).padStart(3)} ` +
-      `cities=${s.cities.slice(0, 3).join('/') || '-'}${s.cities.length > 3 ? '…' : ''} ` +
-      `seller=[${s.business.join(',')}] no-photo=${s.noPhotos}`
-  );
+  const line =
+    `${label}: total=${s.total} n=${s.n} ` +
+    `cities=${s.cities.slice(0, 4).join('/') || '-'}${s.cities.length > 4 ? '…' : ''} ` +
+    `seller=[${s.business.join(',')}] no-photo=${s.noPhotos}`;
+
+  console.log(`  ${line}`);
+  // Each result annotated, because the run log needs repo-admin rights and a
+  // summary alone does not say which param did what.
+  annotate('notice', `OLX filter — ${line}`);
   return s;
 }
 

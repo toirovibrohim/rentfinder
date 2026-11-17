@@ -16,6 +16,7 @@ import {
   processCommands,
   recipients,
   broadcastListing,
+  backfillToday,
 } from './access.js';
 import {
   loadState,
@@ -180,6 +181,21 @@ async function runCheck(searches, config, telegram, { seedOnly = false } = {}) {
       // One site being down must not stop the others.
       failed++;
       console.error(`  [${entry.source.label}] check failed: ${err.message}`);
+    }
+  }
+
+  // Anyone approved part-way through today gets the rest of it. Done after
+  // the normal check, so a listing found moments ago is included.
+  if (!seedOnly) {
+    try {
+      sent += await backfillToday(telegram, config, searches, subscribers, {
+        onChange: () => {
+          ctx.subscribersChanged = true;
+        },
+      });
+    } catch (err) {
+      failed++;
+      console.error(`  catch-up failed: ${err.message}`);
     }
   }
 

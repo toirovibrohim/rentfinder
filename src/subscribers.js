@@ -90,15 +90,46 @@ export async function saveSubscribers(filePath, subscribers, secret) {
   await rename(tmp, filePath);
 }
 
-/** Grants access from now, for `hours`. Re-approving extends from now. */
+/**
+ * Grants access from now, for `hours`. Re-approving extends from now.
+ *
+ * `backfillPending` makes the next check send everything already posted
+ * today, so joining at four in the afternoon still shows the whole day
+ * rather than starting from whatever happens next.
+ */
 export function approve(subscribers, chatId, { hours, name = null }) {
   const now = Date.now();
+  const existing = subscribers[String(chatId)];
+
   subscribers[String(chatId)] = {
-    name,
+    name: name ?? existing?.name ?? null,
     approvedAt: new Date(now).toISOString(),
     expiresAt: new Date(now + hours * 3600 * 1000).toISOString(),
+    // Someone already receiving listings has had today's as they appeared.
+    backfillPending: isActive(existing, now) ? Boolean(existing?.backfillPending) : true,
   };
   return subscribers[String(chatId)];
+}
+
+/** Chats that still owe a catch-up of today's listings. */
+export function awaitingBackfill(subscribers, at = Date.now()) {
+  return Object.entries(subscribers)
+    .filter(([, entry]) => isActive(entry, at) && entry.backfillPending)
+    .map(([chatId]) => chatId);
+}
+
+/** Start of the current day in Tashkent, as a timestamp. */
+export function startOfToday(at = Date.now()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tashkent',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(at));
+
+  const get = (type) => parts.find((p) => p.type === type).value;
+  // Tashkent is UTC+5 year-round, so the day begins at 19:00 UTC previous day.
+  return Date.parse(`${get('year')}-${get('month')}-${get('day')}T00:00:00+05:00`);
 }
 
 export function revoke(subscribers, chatId) {

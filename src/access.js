@@ -12,6 +12,8 @@ import {
   loadSubscribers,
   saveSubscribers,
   activeChatIds,
+  awaitingBackfill,
+  startOfToday,
   pruneExpired,
   revoke,
 } from './subscribers.js';
@@ -160,4 +162,84 @@ export async function broadcastListing(telegram, listing, chatIds, { subscribers
   }
 
   return ownerDelivered;
+}
+
+/**
+ * Sends everything already posted today to people approved part-way through
+ * it, so joining in the afternoon still shows the whole day.
+ *
+ * This is a separate, deeper fetch: the ordinary check only looks far enough
+ * back to spot what is new, which is nowhere near a full day.
+ */
+export async function backfillToday(telegram, config, searches, subscribers, { onChange }) {
+  const pending = awaitingBackfill(subscribers).filter(
+    (chatId) => chatId !== String(config.telegram.chatId)
+  );
+  if (pending.length === 0) return 0;
+
+  const since = startOfToday();
+  console.log(`  catching ${pending.length} new recipient(s) up on today's listings`);
+
+  // Gather today's listings once, then send the same set to each of them.
+  const today = [];
+  for (const { source, search } of searches) {
+    try {
+      const { listings } = await source.fetchListings(search, {
+        pages: 1,
+        maxPages: config.maxPagesToScan,
+        // Keep paging while the page still holds something from today.
+        isKnown: (listing) => listing.adsAtMs !== null && listing.adsAtMs < since,
+      });
+      for (const listing of listings) {
+        if (listing.adsAtMs !== null && listing.adsAtMs >= since) today.push({ listing, source });
+      }
+    } catch (err) {
+      console.warn(`  [${source.label}] could not gather today's listings: ${err.message}`);
+    }
+  }
+
+  today.sort((a, b) => (a.listing.adsAtMs ?? 0) - (b.listing.adsAtMs ?? 0));
+
+  const selected = today.slice(-config.maxBackfillListings);
+  const omitted = today.length - selected.length;
+
+  // Resolve details once for the whole set, not once per recipient.
+  const capped = [];
+  for (const { listing, source } of selected) {
+    const detail = await source.fetchDetail(listing).catch(() => ({}));
+    capped.push({ ...listing, ...detail });
+  }
+
+  let sent = 0;
+  for (const chatId of pending) {
+    try {
+      await telegram.sendText(
+        capped.length === 0
+          ? 'Nothing has been posted yet today. New listings will arrive here as they appear.'
+          : `📋 Catching you up on <b>${capped.length}</b> listing(s) posted today` +
+              (omitted > 0 ? `, the most recent of ${today.length}` : '') +
+              '. New ones will follow as they appear.',
+        { to: chatId }
+      );
+
+      for (const listing of capped) {
+        await telegram.sendListing(listing, { to: chatId });
+        sent++;
+        await new Promise((r) => setTimeout(r, 400));
+      }
+
+      subscribers[chatId].backfillPending = false;
+      onChange?.();
+    } catch (err) {
+      if (isUnreachableChat(err)) {
+        console.warn(`  ${chatId} is unreachable (${err.message}); access removed`);
+        if (revoke(subscribers, chatId)) onChange?.();
+      } else {
+        // Left pending, so the next check tries again.
+        console.warn(`  could not catch ${chatId} up: ${err.message}`);
+      }
+    }
+  }
+
+  return sent;
 }

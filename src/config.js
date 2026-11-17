@@ -120,6 +120,12 @@ export function loadConfig() {
     /** How long an approval lasts, in hours. */
     accessHours: intEnv('ACCESS_HOURS', 24, { min: 1, max: 24 * 365 }),
 
+    /**
+     * Most of today's listings to send someone approved part-way through the
+     * day. Beyond this they get the most recent, and are told so.
+     */
+    maxBackfillListings: intEnv('MAX_BACKFILL_LISTINGS', 30, { min: 1, max: 200 }),
+
     /** Result pages always read per check, per source. */
     pagesToScan: intEnv('PAGES_TO_SCAN', 2, { min: 1, max: 20 }),
 
