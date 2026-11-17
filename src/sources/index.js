@@ -2,8 +2,9 @@
 
 import * as joymee from './joymee.js';
 import * as uybor from './uybor.js';
+import * as olx from './olx.js';
 
-const SOURCES = [joymee, uybor];
+const SOURCES = [joymee, uybor, olx];
 
 /**
  * De-duplicates by key and orders newest first.
@@ -29,6 +30,9 @@ const HOSTS = {
   'uybor.uz': uybor,
   'www.uybor.uz': uybor,
   'api.uybor.uz': uybor,
+  'olx.uz': olx,
+  'www.olx.uz': olx,
+  'm.olx.uz': olx,
 };
 
 export function sourceForUrl(searchUrl) {

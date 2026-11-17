@@ -8,6 +8,8 @@ on:
     paths:
       - 'scripts/probe-sites.js'
       - 'scripts/probe-olx-routes.js'
+      - 'scripts/test-olx.js'
+      - 'src/sources/olx.js'
       - '.github/workflows/probe-sites.yml'
   workflow_dispatch:
 
@@ -25,3 +27,9 @@ jobs:
       - name: Every known route into OLX
         if: always()
         run: node scripts/probe-olx-routes.js
+
+      # The adapter can only be exercised here: OLX answers GitHub runners
+      # but not this project's other egress.
+      - name: OLX adapter against the live site
+        if: always()
+        run: node scripts/test-olx.js
