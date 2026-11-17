@@ -7,6 +7,7 @@ on:
   push:
     paths:
       - 'scripts/probe-sites.js'
+      - 'scripts/probe-olx-routes.js'
       - '.github/workflows/probe-sites.yml'
   workflow_dispatch:
 
@@ -20,3 +21,7 @@ jobs:
         with:
           node-version: '22'
       - run: node scripts/probe-sites.js
+
+      - name: Every known route into OLX
+        if: always()
+        run: node scripts/probe-olx-routes.js
