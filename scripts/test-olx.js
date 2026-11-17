@@ -41,8 +41,12 @@ async function main() {
   console.log('');
 
   check('category resolved', search.params.get('category_id') === '1147', search.params.get('category_id'));
-  check('price filter forwarded', search.params.get('filter_float_price:to') === '600');
-  check('rooms deferred to results', search.clientFilters.length === 1);
+  check('price not sent to the API', !search.params.has('filter_float_price:to'));
+  check(
+    'price and rooms both checked here',
+    search.clientFilters.length === 2,
+    search.clientFilters.map((f) => f.describe).join('; ')
+  );
 
   let result;
   try {
@@ -83,11 +87,25 @@ async function main() {
     withRooms.every((l) => l.rooms === 2 || l.rooms === 3),
     [...new Set(withRooms.map((l) => l.rooms))].join(',')
   );
-  const usd = withPrice.filter((l) => l.currency === 'USD');
+  const dollars = withPrice.filter((l) => ['USD', 'UYE'].includes(l.currency));
   check(
-    'price filter respected for USD listings',
-    usd.every((l) => l.price <= 600),
-    usd.length ? `max ${Math.max(...usd.map((l) => l.price))} USD of ${usd.length}` : 'none priced in USD'
+    'price filter respected for dollar listings',
+    dollars.every((l) => l.price <= 600),
+    dollars.length ? `max ${Math.max(...dollars.map((l) => l.price))} of ${dollars.length}` : 'none in dollars'
+  );
+
+  const som = withPrice.filter((l) => l.currency === 'UZS');
+  const rate = Number.parseFloat(process.env.OLX_UZS_PER_USD || '') || 12600;
+  check(
+    'price filter respected for som listings',
+    som.every((l) => l.price / rate <= 600),
+    som.length ? `max ${Math.round(Math.max(...som.map((l) => l.price)) / rate)} USD-equiv of ${som.length}` : 'none in som'
+  );
+
+  check(
+    'every price is in a currency we understand',
+    withPrice.every((l) => ['USD', 'UYE', 'UZS'].includes(l.currency)),
+    [...new Set(withPrice.map((l) => l.currency))].join(',')
   );
 
   // The price filter is ignored by the API, so it has to be applied here —

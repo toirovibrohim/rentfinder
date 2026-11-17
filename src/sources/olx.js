@@ -49,15 +49,23 @@ const PRICE_CURRENCY = 'USD';
  */
 const UZS_PER_USD = Number.parseFloat(process.env.OLX_UZS_PER_USD || '') || 12600;
 
-/** A listing's price in USD, or null when it cannot be compared. */
+/**
+ * Currencies that already mean dollars.
+ *
+ * Rents here are usually quoted in "у.е." — conventional units, a dollar in
+ * all but name — which this API reports as UYE. Treating that as unknown
+ * would let every such listing skip the price filter entirely.
+ */
+const DOLLAR_CURRENCIES = new Set(['USD', 'UYE', 'U.E.', 'У.Е.', 'УЕ', 'YE']);
+const SOM_CURRENCIES = new Set(['UZS', 'SUM', 'СУМ', 'SO‘M', "SO'M"]);
+
+/** A listing's price in dollars, or null when it cannot be compared. */
 function toPriceCurrency(listing) {
   if (listing.price === null || !Number.isFinite(listing.price)) return null;
 
   const currency = (listing.currency || '').toUpperCase();
-  if (currency === 'USD') return listing.price;
-  if (currency === 'UZS' || currency === 'SUM' || currency === 'СУМ') {
-    return listing.price / UZS_PER_USD;
-  }
+  if (DOLLAR_CURRENCIES.has(currency)) return listing.price;
+  if (SOM_CURRENCIES.has(currency)) return listing.price / UZS_PER_USD;
   return null;
 }
 
