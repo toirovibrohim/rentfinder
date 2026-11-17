@@ -127,11 +127,14 @@ export function loadConfig() {
      * Ignore listings first posted more than this many days ago, however
      * recently they were re-promoted. 0 means no limit.
      *
-     * These sites surface old adverts by bumping them, so without a limit a
-     * listing from 2022 can arrive looking like today's news. Only applies
-     * where the site reveals an original post date — joymee does not.
+     * These sites surface old adverts by bumping them, and uybor in
+     * particular bumps listings first posted in 2022. One day keeps this to
+     * what was genuinely posted today, which is the point of the watcher.
+     *
+     * Only works where the site reveals an original post date. joymee does
+     * not, so its re-promoted listings cannot be told apart from new ones.
      */
-    maxListingAgeDays: intEnv('MAX_LISTING_AGE_DAYS', 0, { min: 0, max: 3650 }),
+    maxListingAgeDays: intEnv('MAX_LISTING_AGE_DAYS', 1, { min: 0, max: 3650 }),
 
     /** Result pages always read per check, per source. */
     pagesToScan: intEnv('PAGES_TO_SCAN', 2, { min: 1, max: 20 }),
