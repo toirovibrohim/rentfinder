@@ -3,7 +3,7 @@
   "sources": {
     "joymee": {
       "seeded": true,
-      "watermark": "2026-11-17T06:21:05.718Z",
+      "watermark": "2026-11-17T06:27:01.760Z",
       "seenIds": [
         "joymee:542877",
         "joymee:606814",
@@ -688,7 +688,16 @@
         "joymee:605810",
         "joymee:607465",
         "joymee:597038",
-        "joymee:601519"
+        "joymee:601519",
+        "joymee:607468",
+        "joymee:607469",
+        "joymee:607471",
+        "joymee:607472",
+        "joymee:607473",
+        "joymee:607474",
+        "joymee:585689",
+        "joymee:607478",
+        "joymee:607480"
       ]
     },
     "uybor": {
@@ -802,7 +811,7 @@
     },
     "olx": {
       "seeded": true,
-      "watermark": "2026-11-17T06:00:00.000Z",
+      "watermark": "2026-11-17T06:14:22.000Z",
       "seenIds": [
         "olx:66801711",
         "olx:66801704",
@@ -934,12 +943,14 @@
         "olx:47502867",
         "olx:46300898",
         "olx:19738228",
-        "olx:66801900"
+        "olx:66801900",
+        "olx:66802034",
+        "olx:66802090"
       ]
     }
   },
-  "totalNotified": 664,
-  "lastCheckedAt": "2026-11-17T06:25:09.213Z",
-  "lastNotifiedAt": "2026-11-17T06:25:09.213Z",
-  "lastUpdateId": 940292011
+  "totalNotified": 675,
+  "lastCheckedAt": "2026-11-17T06:29:25.645Z",
+  "lastNotifiedAt": "2026-11-17T06:29:25.645Z",
+  "lastUpdateId": 940292012
 }
