@@ -222,10 +222,20 @@ export async function backfillToday(telegram, config, searches, subscribers, { o
         { to: chatId }
       );
 
+      let inBatch = 0;
       for (const listing of capped) {
         await telegram.sendListing(listing, { to: chatId });
         sent++;
-        await new Promise((r) => setTimeout(r, 400));
+
+        // Same pacing as a normal check: short gaps, then a pause, so a long
+        // catch-up arrives steadily instead of being refused part-way.
+        inBatch++;
+        if (inBatch >= config.batchSize) {
+          inBatch = 0;
+          await new Promise((r) => setTimeout(r, config.batchPauseSeconds * 1000));
+        } else {
+          await new Promise((r) => setTimeout(r, config.sendIntervalMs));
+        }
       }
 
       subscribers[chatId].backfillPending = false;

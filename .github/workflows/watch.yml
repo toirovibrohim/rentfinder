@@ -43,7 +43,7 @@ jobs:
     # Each run polls for ~25 minutes, so the site keeps being checked even
     # when GitHub delays the schedule. Concurrency keeps at most one run
     # going and one waiting, so these chain instead of piling up.
-    timeout-minutes: 35
+    timeout-minutes: 40
 
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}

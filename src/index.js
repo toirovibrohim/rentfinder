@@ -100,13 +100,20 @@ async function checkSource({ source, search }, config, state, telegram, ctx, { s
   }
 
   // Oldest first, so Telegram shows them in publication order.
+  // Everything new gets sent. When a burst is bigger than one check should
+  // push at Telegram in one go, the remainder is simply left unrecorded and
+  // picked up by the next check — never dropped, and never announced.
   const toSend = fresh.slice(0, config.maxNotificationsPerCheck).reverse();
-  const skipped = fresh.slice(config.maxNotificationsPerCheck);
+  const deferred = fresh.length - toSend.length;
 
-  console.log(`  ${tag} ${fresh.length} new listing(s)`);
+  console.log(
+    `  ${tag} ${fresh.length} new listing(s)` +
+      (deferred > 0 ? ` — sending ${toSend.length}, ${deferred} on the next check` : '')
+  );
 
   const delivered = [];
   let failures = 0;
+  let sentInBatch = 0;
 
   for (const listing of toSend) {
     try {
@@ -119,27 +126,22 @@ async function checkSource({ source, search }, config, state, telegram, ctx, { s
       delivered.push(listing);
       const to = ctx.chatIds.length > 1 ? ` → ${ctx.chatIds.length} chats` : '';
       console.log(`    sent ${listing.key}${to} — ${listing.title.slice(0, 50)}`);
-      await sleep(400); // stay under Telegram's per-chat rate limit
+
+      sentInBatch++;
+      if (sentInBatch >= config.batchSize) {
+        // Telegram tolerates a short burst, then starts refusing. Pausing
+        // between batches keeps a long run of listings flowing steadily.
+        sentInBatch = 0;
+        console.log(`    pausing ${config.batchPauseSeconds}s before the next batch`);
+        await sleep(config.batchPauseSeconds * 1000);
+      } else {
+        await sleep(config.sendIntervalMs);
+      }
     } catch (err) {
       failures++;
       console.error(`    FAILED ${listing.key}: ${err.message}`);
       // Left unrecorded, so the next check retries it.
     }
-  }
-
-  if (skipped.length > 0) {
-    try {
-      const note =
-        `ℹ️ ${skipped.length} more new listing(s) on ${source.label} matched but were not sent, ` +
-        `to avoid flooding. They will not be re-sent — open the search to see them.`;
-      for (const chatId of ctx.chatIds) {
-        await telegram.sendText(note, { to: chatId }).catch(() => {});
-      }
-    } catch (err) {
-      console.error(`    could not send the overflow note: ${err.message}`);
-    }
-    // Mark them handled so they do not pile up forever.
-    delivered.push(...skipped);
   }
 
   if (delivered.length > 0) {
@@ -247,11 +249,20 @@ async function main() {
 
   for (let i = 1; i <= iterations; i++) {
     console.log(`[${stamp()}] check ${i}/${iterations}`);
+
+    const startedAt = Date.now();
     const result = await runCheck(searches, config, telegram);
     totalSent += result.sent;
     totalFailed += result.failed;
 
-    if (i < iterations) await sleep(config.pollIntervalSeconds * 1000);
+    if (i < iterations) {
+      // Count the check itself against the interval. Sending a burst can
+      // take a while, and without this a busy run would overrun its job
+      // timeout and be killed part-way.
+      const elapsed = Date.now() - startedAt;
+      const wait = Math.max(0, config.pollIntervalSeconds * 1000 - elapsed);
+      if (wait > 0) await sleep(wait);
+    }
   }
 
   console.log(`\nRun finished: ${totalSent} sent, ${totalFailed} failure(s).`);

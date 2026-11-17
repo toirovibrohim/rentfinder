@@ -135,8 +135,20 @@ export function loadConfig() {
     /** Seconds between checks inside one process. */
     pollIntervalSeconds: intEnv('POLL_INTERVAL_SECONDS', 60, { min: 10, max: 3600 }),
 
-    /** Safety valve: never send more than this many messages in one check. */
-    maxNotificationsPerCheck: intEnv('MAX_NOTIFICATIONS_PER_CHECK', 25, { min: 1, max: 100 }),
+    /**
+     * Most listings one check will send. Anything beyond this is not dropped
+     * — it is left unrecorded and goes out on the next check, a minute later.
+     */
+    maxNotificationsPerCheck: intEnv('MAX_NOTIFICATIONS_PER_CHECK', 60, { min: 1, max: 500 }),
+
+    /** Messages sent back-to-back before pausing. */
+    batchSize: intEnv('BATCH_SIZE', 15, { min: 1, max: 100 }),
+
+    /** Pause between batches, which is what keeps Telegram from refusing. */
+    batchPauseSeconds: intEnv('BATCH_PAUSE_SECONDS', 12, { min: 1, max: 120 }),
+
+    /** Gap between individual messages inside a batch. */
+    sendIntervalMs: intEnv('SEND_INTERVAL_MS', 400, { min: 50, max: 5000 }),
 
     /** How many listing keys to remember per source, for de-duplication. */
     seenIdsToKeep: intEnv('SEEN_IDS_TO_KEEP', 1000, { min: 100, max: 20000 }),
