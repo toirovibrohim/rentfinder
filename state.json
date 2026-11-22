@@ -935,7 +935,7 @@
     },
     "uybor": {
       "seeded": true,
-      "watermark": "2026-11-22T11:41:04.940Z",
+      "watermark": "2026-11-22T12:50:39.441Z",
       "seenIds": [
         "uybor:1325370",
         "uybor:1325362",
@@ -1170,14 +1170,15 @@
         "uybor:1325642",
         "uybor:1325643",
         "uybor:1325646",
-        "uybor:1325647"
+        "uybor:1325647",
+        "uybor:1325656",
+        "uybor:1325654"
       ]
     },
     "olx": {
       "seeded": true,
-      "watermark": "2026-11-22T12:17:29.000Z",
+      "watermark": "2026-11-22T12:23:20.000Z",
       "seenIds": [
-        "olx:66810358",
         "olx:66810418",
         "olx:66810554",
         "olx:66810707",
@@ -2176,12 +2177,13 @@
         "olx:66864078",
         "olx:66864241",
         "olx:66864505",
-        "olx:66864430"
+        "olx:66864430",
+        "olx:66864578"
       ]
     }
   },
-  "totalNotified": 2167,
-  "lastCheckedAt": "2026-11-22T12:27:35.952Z",
-  "lastNotifiedAt": "2026-11-22T12:24:37.480Z",
+  "totalNotified": 2170,
+  "lastCheckedAt": "2026-11-22T12:52:12.799Z",
+  "lastNotifiedAt": "2026-11-22T12:51:19.459Z",
   "lastUpdateId": 940292024
 }
