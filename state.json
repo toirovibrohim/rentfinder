@@ -944,7 +944,11 @@
         "joymee:614090",
         "joymee:614110",
         "joymee:614115",
-        "joymee:604110"
+        "joymee:604110",
+        "joymee:580622",
+        "joymee:594197",
+        "joymee:540304",
+        "joymee:599335"
       ]
     },
     "uybor": {
@@ -2199,8 +2203,8 @@
       ]
     }
   },
-  "totalNotified": 2334,
-  "lastCheckedAt": "2026-11-23T05:11:09.707Z",
-  "lastNotifiedAt": "2026-11-23T05:07:08.317Z",
+  "totalNotified": 2338,
+  "lastCheckedAt": "2026-11-23T05:38:08.130Z",
+  "lastNotifiedAt": "2026-11-23T05:12:44.514Z",
   "lastUpdateId": 940292024
 }
