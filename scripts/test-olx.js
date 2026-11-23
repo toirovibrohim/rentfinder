@@ -51,9 +51,24 @@ async function main() {
     search.clientFilters.map((f) => f.describe).join('; ')
   );
 
+  // What districts does OLX name at all? Needed to tell a wrong match
+  // string apart from a genuinely empty page.
+  const unfiltered = { ...search, clientFilters: [] };
+  try {
+    const { listings: raw } = await fetchListings(unfiltered, { pages: 1, maxPages: 1 });
+    const names = [...new Set(raw.map((l) => l.district).filter(Boolean))];
+    annotate('notice', `OLX district names seen: ${names.join(' | ') || 'none'}`);
+    const matching = raw.filter((l) => (l.district || '').toLowerCase().includes('юнусабад'));
+    annotate('notice', `OLX Yunusobod on page 1: ${matching.length} of ${raw.length} (rooms: ${matching.map((l) => l.rooms).join(',') || 'none'})`);
+  } catch (err) {
+    annotate('warning', `OLX district survey failed: ${err.message}`);
+  }
+
   let result;
   try {
-    result = await fetchListings(search, { pages: 1, maxPages: 1 });
+    // The watcher pages deeper than this; a narrow filter can legitimately
+    // find nothing on one page.
+    result = await fetchListings(search, { pages: 3, maxPages: 6 });
   } catch (err) {
     check('reachable', false, err.message);
     annotate('error', `OLX adapter could not fetch: ${err.message}`);
@@ -64,7 +79,7 @@ async function main() {
 
   const { listings, filteredCount } = result;
   check('reachable', true, `${filteredCount ?? '?'} match the filters`);
-  check('returned listings', listings.length > 0, `${listings.length} on page 1`);
+  check('returned listings', listings.length > 0, `${listings.length} across the pages read`);
 
   if (listings.length === 0) {
     annotate('warning', 'OLX adapter reached the API but got no listings.');
