@@ -3,7 +3,7 @@
   "sources": {
     "joymee": {
       "seeded": true,
-      "watermark": "2026-11-22T18:21:14.542Z",
+      "watermark": "2026-11-22T19:57:50.651Z",
       "seenIds": [
         "joymee:542877",
         "joymee:606814",
@@ -936,7 +936,11 @@
         "joymee:613848",
         "joymee:613876",
         "joymee:610138",
-        "joymee:586817"
+        "joymee:586817",
+        "joymee:613963",
+        "joymee:614011",
+        "joymee:614019",
+        "joymee:614020"
       ]
     },
     "uybor": {
@@ -2191,8 +2195,8 @@
       ]
     }
   },
-  "totalNotified": 2222,
-  "lastCheckedAt": "2026-11-23T01:17:22.762Z",
-  "lastNotifiedAt": "2026-11-23T01:09:16.976Z",
+  "totalNotified": 2226,
+  "lastCheckedAt": "2026-11-23T01:42:54.091Z",
+  "lastNotifiedAt": "2026-11-23T01:39:45.808Z",
   "lastUpdateId": 940292024
 }
