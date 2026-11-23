@@ -8,6 +8,7 @@ on:
     paths:
       - 'scripts/probe-sites.js'
       - 'scripts/test-olx.js'
+      - 'scripts/probe-olx-stages.js'
       - 'scripts/test-no-misses.js'
       - 'src/state.js'
       - 'scripts/probe-olx-funnel.js'
@@ -30,6 +31,10 @@ jobs:
 
       # The adapter can only be exercised here: OLX answers GitHub runners
       # but not this project's other egress.
+      - name: Which OLX filter stage empties the result
+        if: always()
+        run: node scripts/probe-olx-stages.js
+
       - name: Where OLX listings are lost
         if: always()
         run: node scripts/probe-olx-funnel.js
