@@ -11,7 +11,6 @@ on:
       - 'scripts/probe-olx-stages.js'
       - 'scripts/test-no-misses.js'
       - 'src/state.js'
-      - 'scripts/probe-olx-funnel.js'
       - 'src/sources/olx.js'
       - '.github/workflows/probe-sites.yml'
   workflow_dispatch:
@@ -34,10 +33,6 @@ jobs:
       - name: Which OLX filter stage empties the result
         if: always()
         run: node scripts/probe-olx-stages.js
-
-      - name: Where OLX listings are lost
-        if: always()
-        run: node scripts/probe-olx-funnel.js
 
       - name: OLX adapter against the live site
         if: always()
