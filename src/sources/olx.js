@@ -162,6 +162,19 @@ export function buildSearch(searchUrl) {
       continue;
     }
 
+    // Matched on the district name the API returns with each listing,
+    // rather than an id. OLX's district ids are not discoverable from here,
+    // and the name is right there on every result.
+    if (key === 'district_name') {
+      const wanted = value.toLowerCase();
+      clientFilters.push({
+        describe: `district matches "${value}"`,
+        test: (listing) => (listing.district || '').toLowerCase().includes(wanted),
+      });
+      notes.push(`district "${value}", checked after fetching`);
+      continue;
+    }
+
     if (key === 'photos' && (value === '1' || value === 'true')) {
       clientFilters.push({
         describe: 'has at least one photo',
@@ -234,6 +247,7 @@ function normalise(raw) {
     price: Number.isFinite(price) ? price : null,
     currency,
     address: [city, district].filter(Boolean).join(', '),
+    district,
     image: photo ? photo.replace('{width}x{height}', '800x600') : null,
     adsAt: createdAt,
     adsAtMs: createdAt ? Date.parse(createdAt) : null,

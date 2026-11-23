@@ -36,7 +36,7 @@ const SERVER_SIDE = new Set([
 ]);
 
 /** Params the API accepts but ignores, so they must be applied to results. */
-const CLIENT_SIDE = new Set(['room__gte', 'room__lte', 'price__gte', 'price__lte']);
+const CLIENT_SIDE = new Set(['room__gte', 'room__lte', 'room__eq', 'price__gte', 'price__lte']);
 
 const UI_ONLY = new Set(['page', 'limit', 'offset', 'order', 'lang', 'locale']);
 
@@ -65,11 +65,12 @@ export function buildSearch(searchUrl) {
       if (!Number.isFinite(bound)) continue;
 
       clientFilters.push({
-        describe: `${field} ${op === 'gte' ? '>=' : '<='} ${bound}`,
+        describe: `${field} ${op === 'gte' ? '>=' : op === 'eq' ? '==' : '<='} ${bound}`,
         test: (listing) => {
           const actual = field === 'room' ? listing.rooms : listing.price;
           // "6+" rooms and missing values cannot be compared; keep them.
           if (actual === null || !Number.isFinite(actual)) return true;
+          if (op === 'eq') return actual === bound;
           return op === 'gte' ? actual >= bound : actual <= bound;
         },
       });

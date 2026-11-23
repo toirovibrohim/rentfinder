@@ -8,6 +8,7 @@
  */
 
 import { buildSearch, fetchListings } from '../src/sources/olx.js';
+import { DEFAULT_SEARCH_URLS } from '../src/config.js';
 
 const annotate = (level, message) => {
   if (process.env.GITHUB_ACTIONS) {
@@ -17,10 +18,7 @@ const annotate = (level, message) => {
 
 const SEARCH =
   process.env.OLX_SEARCH_URL ||
-  'https://www.olx.uz/nedvizhimost/kvartiry/arenda-dolgosrochnaya/tashkent/' +
-    '?search%5Bfilter_float_price%3Ato%5D=600' +
-    '&search%5Bfilter_enum_number_of_rooms%5D%5B0%5D=2' +
-    '&search%5Bfilter_enum_number_of_rooms%5D%5B1%5D=3';
+  DEFAULT_SEARCH_URLS.find((u) => u.includes('olx.uz'));
 
 let failures = 0;
 const check = (label, ok, detail = '') => {
@@ -41,15 +39,15 @@ async function main() {
   console.log('');
 
   check('category resolved', search.params.get('category_id') === '1147', search.params.get('category_id'));
-  check('price not sent to the API', !search.params.has('filter_float_price:to'));
+  check('city resolved to Tashkent', search.params.get('city_id') === '4', search.params.get('city_id'));
   check(
     'not sorted by creation, which would hide bumped listings',
     !search.params.has('sort_by'),
     search.params.get('sort_by') || 'default order'
   );
   check(
-    'price and rooms both checked here',
-    search.clientFilters.length === 2,
+    'filters the API ignores are checked here instead',
+    search.clientFilters.length >= 1,
     search.clientFilters.map((f) => f.describe).join('; ')
   );
 
@@ -92,6 +90,19 @@ async function main() {
     withRooms.every((l) => l.rooms === 2 || l.rooms === 3),
     [...new Set(withRooms.map((l) => l.rooms))].join(',')
   );
+  const districts = [...new Set(listings.map((l) => l.district).filter(Boolean))];
+  annotate('notice', `OLX districts returned: ${districts.join(' | ') || 'none'}`);
+  check(
+    'only the requested district',
+    districts.every((d) => d.toLowerCase().includes('юнусабад')),
+    districts.join(', ') || 'no listings to judge'
+  );
+  check(
+    'only the requested room count',
+    withRooms.every((l) => l.rooms === 3),
+    [...new Set(withRooms.map((l) => l.rooms))].join(',') || 'none with a room count'
+  );
+
   const dollars = withPrice.filter((l) => ['USD', 'UYE'].includes(l.currency));
   check(
     'price filter respected for dollar listings',

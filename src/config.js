@@ -12,16 +12,29 @@ import { readFileSync } from 'node:fs';
  * includes agencies.
  */
 export const DEFAULT_SEARCH_URLS = [
-  // joymee: long-term rent, apartments, Tashkent city, private owners.
+  // joymee: 3-room apartments, long-term rent, Yunusobod, private owners.
   'https://joymee.uz/?entity_purpose=long_term_rent&entity_type=apartment' +
-    '&region=59&advertiser=1',
+    '&region=59&district=199&room_qty_min=3&room_qty_max=3&advertiser=1',
 
-  // uybor: rent, apartments, Tashkent. No owner-only filter exists here.
-  'https://uybor.uz/listings?operationType__eq=rent&category__eq=7&region__eq=13',
+  // uybor: 3-room apartments for rent in Yunusobod. No owner-only filter
+  // exists here, so agencies are included.
+  //
+  // Two entries because uybor tags Yunusobod under two district ids — 197,
+  // which carries the bulk, and 440700, a newer one with far fewer. Asking
+  // for both at once returns a 500, so they are separate searches. They
+  // share one source and one de-duplication list, so nothing arrives twice.
+  'https://uybor.uz/listings?operationType__eq=rent&category__eq=7' +
+    '&region__eq=13&district__eq=197&room__eq=3',
+  'https://uybor.uz/listings?operationType__eq=rent&category__eq=7' +
+    '&region__eq=13&district__eq=440700&room__eq=3',
 
-  // olx: long-term rent, apartments, Tashkent, private sellers, with photos.
+  // olx: 3-room apartments, long-term rent, Yunusobod, private sellers,
+  // with photos. District is matched on the name OLX returns with each
+  // listing, since its district ids are not discoverable from here.
   'https://www.olx.uz/nedvizhimost/kvartiry/arenda-dolgosrochnaya/tashkent/' +
-    '?search%5Bprivate_business%5D=private&search%5Bphotos%5D=1',
+    '?search%5Bprivate_business%5D=private&search%5Bphotos%5D=1' +
+    '&search%5Bdistrict_name%5D=%D0%AE%D0%BD%D1%83%D1%81%D0%B0%D0%B1%D0%B0%D0%B4' +
+    '&search%5Bfilter_enum_number_of_rooms%5D%5B0%5D=3',
 ];
 
 /**
